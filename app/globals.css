@@ -1,26 +1,118 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  /* Palette - Dark theme */
+  --color-bg: #0A0A0A;
+  --color-bg-elevated: #131313;
+  --color-bg-surface: #1A1A1A;
+  
+  /* Texte */
+  --color-text-primary: #F5F5F5;
+  --color-text-secondary: #9CA3AF;
+  --color-text-muted: #525252;
+  
+  /* Accent chartreuse */
+  --color-accent: #A8FF00;
+  --color-accent-hover: #98E600;
+  --color-accent-muted: #4D7300;
+  
+  /* États */
+  --color-danger: #FF5A5F;
+  --color-danger-muted: #7F2D30;
+  --color-success: var(--color-accent);
+  
+  /* Bordures */
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.16);
+  
+  /* Glass effect */
+  --color-glass: rgba(255, 255, 255, 0.04);
+  --color-glass-strong: rgba(255, 255, 255, 0.08);
+  
+  /* Fontes (référencent les CSS variables injectées par next/font) */
+  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
+  --font-serif: var(--font-instrument-serif), Georgia, serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Base styles */
+html {
+  background: var(--color-bg);
+  color: var(--color-text-primary);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Selection */
+::selection {
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
+
+/* Scrollbar custom (subtil) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent-muted);
+}
+
+/* Filtre image automatique pour photos N&B désaturées */
+.photo-treated {
+  filter: grayscale(1) brightness(0.55) contrast(1.1);
+  mix-blend-mode: luminosity;
+}
+
+/* Glassmorph utility (pour l'instant, on verra si on en fait une classe Tailwind plus tard) */
+
+/* Gradient subtil pour les hero / backgrounds */
+
+
+.bg-login {
+  position: relative;
+  isolation: isolate;
+}
+
+.bg-login::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: url('/login.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: brightness(0.33) contrast(1.2);
+}
+
+
+.bg-register {
+  position: relative;
+  isolation: isolate;
+}
+
+.bg-register::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: url('/register.webp');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: grayscale(1) brightness(0.30) contrast(1.0);
 }

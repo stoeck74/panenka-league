@@ -15,62 +15,69 @@ export default async function LoginPage({
   const errorMessage = params.error ? errorMessages[params.error] : null
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-md">
-        <h1 className="text-3xl font-bold mb-6 text-center">
-          Panenka League
-        </h1>
-        <p className="text-gray-600 mb-8 text-center">
-          Connexion à ton compte
-        </p>
+    <main className="min-h-screen flex items-center justify-center px-4 py-8 bg-login">
+<div className="bg-black/35 backdrop-blur-xl backdrop-saturate-150 border border-white/10 rounded-2xl p-8 md:p-12 w-full max-w-3xl shadow-2xl shadow-black/40">
+        <div className="flex flex-col md:flex-row gap-8 md:gap-12 md:items-stretch">
 
-        {errorMessage && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded text-sm">
-            {errorMessage}
-          </div>
-        )}
-
-        <form action={loginAction} className="space-y-4">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium mb-1">
-              Email
-            </label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+          {/* Partie gauche : logo + tagline */}
+          <div className="flex flex-col items-center justify-center text-center md:flex-1 md:border-r md:border-white/10 md:pr-12">
+            <img src="/logo.svg" alt="Panenka League" className="w-40 md:w-48 mb-4" />
           </div>
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium mb-1">
-              Mot de passe
-            </label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+          {/* Partie droite : formulaire */}
+          <div className="md:flex-1">
+            {errorMessage && (
+              <div className="mb-6 px-4 py-3 bg-danger/10 border border-danger/30 text-danger rounded-lg text-sm">
+                {errorMessage}
+              </div>
+            )}
+
+            <form action={loginAction} className="space-y-5">
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-2">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  required
+                  autoComplete="email"
+                  className="w-full px-4 py-3 bg-bg-elevated border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-text-secondary mb-2">
+                  Mot de passe
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  name="password"
+                  required
+                  autoComplete="current-password"
+                  className="w-full px-4 py-3 bg-bg-elevated border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full mt-2 bg-accent text-bg py-3 rounded-lg font-semibold hover:bg-accent-hover transition-colors"
+              >
+                Se connecter
+              </button>
+
+              <p className="text-center text-sm text-text-secondary pt-2">
+                Pas encore inscrit ?{" "}
+                <Link href="/register" className="text-accent hover:underline">
+                  Créer un compte
+                </Link>
+              </p>
+            </form>
           </div>
 
-          <button
-            type="submit"
-            className="w-full bg-blue-600 text-white py-2 rounded font-medium hover:bg-blue-700 transition"
-          >
-            Se connecter
-          </button>
-        </form>
-
-        <p className="text-center mt-6 text-sm text-gray-600">
-          Pas encore inscrit ?{" "}
-          <Link href="/register" className="text-blue-600 hover:underline">
-            Créer un compte
-          </Link>
-        </p>
+        </div>
       </div>
     </main>
   )
