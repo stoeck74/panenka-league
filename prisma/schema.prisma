@@ -1,5 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// Panenka League - Database Schema
+// Documentation : https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client"
@@ -10,11 +10,182 @@ datasource db {
   provider = "postgresql"
 }
 
+// ============================================
+// ENUMS
+// ============================================
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum MatchdayStatus {
+  UPCOMING    // pas encore commencée
+  ACTIVE      // ouverte aux pronos
+  FINISHED    // tous les matchs joués
+}
+
+enum MatchStatus {
+  SCHEDULED   // prévu, pas encore commencé
+  LIVE        // en cours
+  FINISHED    // terminé
+  POSTPONED   // reporté
+}
+
+// ============================================
+// USER & AUTH
+// ============================================
+
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  username  String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(cuid())
+  email         String   @unique
+  username      String   @unique
+  password      String   // sera hashé avec bcrypt
+  name          String?
+  avatar        String?  // URL de l'avatar
+  favoriteTeamId String?
+  role          UserRole @default(USER)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  favoriteTeam  Team?        @relation(fields: [favoriteTeamId], references: [id])
+  predictions   Prediction[]
+  invitationsCreated InvitationCode[]
+}
+
+model InvitationCode {
+  id          String   @id @default(cuid())
+  code        String   @unique // ex: "PANENKA-2026-XXXX"
+  
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  
+  usedById    String?  @unique // null = pas encore utilisé
+  usedAt      DateTime?
+  
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+}
+
+// ============================================
+// SEASON & TEAM
+// ============================================
+
+model Season {
+  id          String   @id @default(cuid())
+  name        String   // ex: "Ligue 1 2025/2026"
+  externalId  Int?     @unique // ID Football-Data
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean  @default(false) // une seule saison active à la fois
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  matchdays   Matchday[]
+  teams       SeasonTeam[]
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  externalId  Int      @unique // ID Football-Data
+  name        String   // "Olympique de Marseille"
+  shortName   String   // "Marseille"
+  tla         String   // "OM" (Three Letter Abbreviation)
+  crestUrl    String?  // URL du blason
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  homeMatches    Match[]   @relation("HomeTeam")
+  awayMatches    Match[]   @relation("AwayTeam")
+  fans           User[]    // les users qui ont cette team en favorite
+  seasons        SeasonTeam[]
+}
+
+// Table de jonction Season <-> Team (un même club joue plusieurs saisons)
+model SeasonTeam {
+  seasonId String
+  teamId   String
+  
+  season   Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  team     Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  
+  @@id([seasonId, teamId])
+}
+
+// ============================================
+// MATCHDAY & MATCH
+// ============================================
+
+model Matchday {
+  id          String         @id @default(cuid())
+  number      Int            // 1 à 34
+  seasonId    String
+  status      MatchdayStatus @default(UPCOMING)
+  
+  startDate   DateTime       // date du premier match prévu
+  endDate     DateTime       // date du dernier match prévu
+  
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  
+  // Relations
+  season      Season         @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  matches     Match[]
+  
+  @@unique([seasonId, number])
+}
+
+model Match {
+  id            String       @id @default(cuid())
+  externalId    Int          @unique // ID Football-Data
+  matchdayId    String
+  
+  homeTeamId    String
+  awayTeamId    String
+  
+  kickoffAt     DateTime     // heure du coup d'envoi
+  status        MatchStatus  @default(SCHEDULED)
+  
+  homeScore     Int?         // null tant que pas joué
+  awayScore     Int?
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  // Relations
+  matchday      Matchday     @relation(fields: [matchdayId], references: [id], onDelete: Cascade)
+  homeTeam      Team         @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam      Team         @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  predictions   Prediction[]
+}
+
+// ============================================
+// PREDICTION
+// ============================================
+
+model Prediction {
+  id              String   @id @default(cuid())
+  userId          String
+  matchId         String
+  
+  homeScore       Int      // score domicile prédit
+  awayScore       Int      // score extérieur prédit
+  isBanco         Boolean  @default(false)
+  
+  pointsEarned    Int?     // calculé après que le match soit joué
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  match           Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, matchId]) // un seul prono par user par match
 }
