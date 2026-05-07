@@ -53,6 +53,8 @@ model User {
   favoriteTeam  Team?        @relation(fields: [favoriteTeamId], references: [id])
   predictions   Prediction[]
   invitationsCreated InvitationCode[]
+  accounts           Account[]
+  sessions           Session[]
 }
 
 model InvitationCode {
@@ -188,4 +190,42 @@ model Prediction {
   match           Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
   
   @@unique([userId, matchId]) // un seul prono par user par match
+}
+
+// ============================================
+// AUTH.JS TABLES
+// ============================================
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+  
+  @@id([identifier, token])
 }
