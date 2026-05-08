@@ -116,3 +116,68 @@ body {
   background-repeat: no-repeat;
   filter: grayscale(1) brightness(0.30) contrast(1.0);
 }
+
+.bg-dashboard {
+  position: relative;
+  isolation: isolate;
+}
+
+.bg-dashboard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: url('/dashboard.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: grayscale(1) brightness(0.3) contrast(1.2);
+}
+
+.bg-home {
+  position: relative;
+  isolation: isolate;
+}
+
+.bg-home::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: url('/home.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: brightness(0.6) contrast(1);
+}
+
+/* ============================================
+   SCROLLBAR HIDE
+   Pour les zones scrollables sans barre visible
+   ============================================ */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+
+.bg-matches {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+}
+
+.bg-matches::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: url('/matches.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: brightness(0.15) contrast(1);
+}
