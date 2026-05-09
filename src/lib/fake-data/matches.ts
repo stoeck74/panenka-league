@@ -269,3 +269,274 @@ export const fakeMatchdays: FakeMatchday[] = [
   { number: 24, status: "future", matchesCount: 9 },
   { number: 25, status: "future", matchesCount: 9 },
 ]
+
+// ============================================
+// J21 — Journée passée (matchs terminés avec scores)
+// ============================================
+export const fakeJ21Matches: FakeMatchDetailed[] = [
+  {
+    id: "j21-1",
+    matchday: 21,
+    homeTeam: TEAMS.PSG,
+    awayTeam: TEAMS.LOSC,
+    kickoffDate: "Vendredi 2 mai",
+    kickoffTime: "21:00",
+    status: "finished",
+    homeScore: 3,
+    awayScore: 1,
+    myHomePrediction: 2,
+    myAwayPrediction: 1,
+    isBanco: false,
+    myPoints: 1, // Bon résultat (PSG gagne) mais pas score exact
+  },
+  {
+    id: "j21-2",
+    matchday: 21,
+    homeTeam: TEAMS.OM,
+    awayTeam: TEAMS.OL,
+    kickoffDate: "Samedi 3 mai",
+    kickoffTime: "21:00",
+    status: "finished",
+    homeScore: 2,
+    awayScore: 2,
+    myHomePrediction: 2,
+    myAwayPrediction: 2,
+    isBanco: true,
+    myPoints: 6, // Score exact + banco × 2 = 6
+  },
+  {
+    id: "j21-3",
+    matchday: 21,
+    homeTeam: TEAMS.ASM,
+    awayTeam: TEAMS.NICE,
+    kickoffDate: "Samedi 3 mai",
+    kickoffTime: "17:00",
+    status: "finished",
+    homeScore: 1,
+    awayScore: 0,
+    myHomePrediction: 0,
+    myAwayPrediction: 2,
+    isBanco: false,
+    myPoints: 0, // Mauvais résultat
+  },
+  {
+    id: "j21-4",
+    matchday: 21,
+    homeTeam: TEAMS.RENNES,
+    awayTeam: TEAMS.STRASBOURG,
+    kickoffDate: "Dimanche 4 mai",
+    kickoffTime: "15:00",
+    status: "finished",
+    homeScore: 2,
+    awayScore: 1,
+    myHomePrediction: 2,
+    myAwayPrediction: 1,
+    isBanco: false,
+    myPoints: 3, // Score exact
+  },
+  {
+    id: "j21-5",
+    matchday: 21,
+    homeTeam: TEAMS.LENS,
+    awayTeam: TEAMS.NANTES,
+    kickoffDate: "Dimanche 4 mai",
+    kickoffTime: "15:00",
+    status: "finished",
+    homeScore: 1,
+    awayScore: 1,
+    myHomePrediction: null,
+    myAwayPrediction: null,
+    isBanco: false,
+    myPoints: 0, // Pas de prono
+  },
+  {
+    id: "j21-6",
+    matchday: 21,
+    homeTeam: TEAMS.REIMS,
+    awayTeam: TEAMS.TOULOUSE,
+    kickoffDate: "Dimanche 4 mai",
+    kickoffTime: "15:00",
+    status: "finished",
+    homeScore: 0,
+    awayScore: 2,
+    myHomePrediction: 1,
+    myAwayPrediction: 2,
+    isBanco: false,
+    myPoints: 1, // Bon résultat (Toulouse gagne) mais pas le score exact
+  },
+  {
+    id: "j21-7",
+    matchday: 21,
+    homeTeam: TEAMS.MONTPELLIER,
+    awayTeam: TEAMS.ANGERS,
+    kickoffDate: "Dimanche 4 mai",
+    kickoffTime: "17:00",
+    status: "finished",
+    homeScore: 1,
+    awayScore: 1,
+    myHomePrediction: 0,
+    myAwayPrediction: 0,
+    isBanco: false,
+    myPoints: 1, // Bon résultat (nul) mais pas le score exact
+  },
+  {
+    id: "j21-8",
+    matchday: 21,
+    homeTeam: TEAMS.AUXERRE,
+    awayTeam: TEAMS.BREST,
+    kickoffDate: "Dimanche 4 mai",
+    kickoffTime: "17:00",
+    status: "finished",
+    homeScore: 2,
+    awayScore: 0,
+    myHomePrediction: 1,
+    myAwayPrediction: 0,
+    isBanco: false,
+    myPoints: 1, // Bon résultat (Auxerre gagne)
+  },
+  {
+    id: "j21-9",
+    matchday: 21,
+    homeTeam: TEAMS.LE_HAVRE,
+    awayTeam: TEAMS.SAINT_ETIENNE,
+    kickoffDate: "Dimanche 4 mai",
+    kickoffTime: "21:00",
+    status: "finished",
+    homeScore: 0,
+    awayScore: 1,
+    myHomePrediction: 1,
+    myAwayPrediction: 0,
+    isBanco: false,
+    myPoints: 0, // Mauvais résultat
+  },
+]
+
+// ============================================
+// J23 — Journée future (pas encore pronostiquable)
+// ============================================
+export const fakeJ23Matches: FakeMatchDetailed[] = [
+  {
+    id: "j23-1",
+    matchday: 23,
+    homeTeam: TEAMS.LOSC,
+    awayTeam: TEAMS.PSG,
+    kickoffDate: "Vendredi 16 mai",
+    kickoffTime: "21:00",
+    status: "scheduled",
+    myHomePrediction: null,
+    myAwayPrediction: null,
+    isBanco: false,
+  },
+  {
+    id: "j23-2",
+    matchday: 23,
+    homeTeam: TEAMS.OL,
+    awayTeam: TEAMS.OM,
+    kickoffDate: "Dimanche 18 mai",
+    kickoffTime: "20:45",
+    status: "scheduled",
+    myHomePrediction: null,
+    myAwayPrediction: null,
+    isBanco: false,
+  },
+  {
+    id: "j23-3",
+    matchday: 23,
+    homeTeam: TEAMS.NICE,
+    awayTeam: TEAMS.ASM,
+    kickoffDate: "Samedi 17 mai",
+    kickoffTime: "21:00",
+    status: "scheduled",
+    myHomePrediction: null,
+    myAwayPrediction: null,
+    isBanco: false,
+  },
+  {
+    id: "j23-4",
+    matchday: 23,
+    homeTeam: TEAMS.STRASBOURG,
+    awayTeam: TEAMS.RENNES,
+    kickoffDate: "Samedi 17 mai",
+    kickoffTime: "17:00",
+    status: "scheduled",
+    myHomePrediction: null,
+    myAwayPrediction: null,
+    isBanco: false,
+  },
+  {
+    id: "j23-5",
+    matchday: 23,
+    homeTeam: TEAMS.NANTES,
+    awayTeam: TEAMS.LENS,
+    kickoffDate: "Dimanche 18 mai",
+    kickoffTime: "15:00",
+    status: "scheduled",
+    myHomePrediction: null,
+    myAwayPrediction: null,
+    isBanco: false,
+  },
+  {
+    id: "j23-6",
+    matchday: 23,
+    homeTeam: TEAMS.TOULOUSE,
+    awayTeam: TEAMS.REIMS,
+    kickoffDate: "Dimanche 18 mai",
+    kickoffTime: "15:00",
+    status: "scheduled",
+    myHomePrediction: null,
+    myAwayPrediction: null,
+    isBanco: false,
+  },
+  {
+    id: "j23-7",
+    matchday: 23,
+    homeTeam: TEAMS.ANGERS,
+    awayTeam: TEAMS.MONTPELLIER,
+    kickoffDate: "Dimanche 18 mai",
+    kickoffTime: "15:00",
+    status: "scheduled",
+    myHomePrediction: null,
+    myAwayPrediction: null,
+    isBanco: false,
+  },
+  {
+    id: "j23-8",
+    matchday: 23,
+    homeTeam: TEAMS.BREST,
+    awayTeam: TEAMS.AUXERRE,
+    kickoffDate: "Dimanche 18 mai",
+    kickoffTime: "17:00",
+    status: "scheduled",
+    myHomePrediction: null,
+    myAwayPrediction: null,
+    isBanco: false,
+  },
+  {
+    id: "j23-9",
+    matchday: 23,
+    homeTeam: TEAMS.SAINT_ETIENNE,
+    awayTeam: TEAMS.LE_HAVRE,
+    kickoffDate: "Dimanche 18 mai",
+    kickoffTime: "20:45",
+    status: "scheduled",
+    myHomePrediction: null,
+    myAwayPrediction: null,
+    isBanco: false,
+  },
+]
+
+// ============================================
+// HELPER — Récupérer les matchs d'une journée
+// ============================================
+export function getMatchesByMatchday(matchday: number): FakeMatchDetailed[] {
+  switch (matchday) {
+    case 21:
+      return fakeJ21Matches
+    case 22:
+      return fakeJ22Matches
+    case 23:
+      return fakeJ23Matches
+    default:
+      return [] // Journées sans données placeholder pour l'instant
+  }
+}

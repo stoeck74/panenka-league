@@ -37,21 +37,25 @@ enum MatchStatus {
 // ============================================
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  username      String   @unique
-  password      String   // sera hashé avec bcrypt
-  name          String?
-  avatar        String?  // URL de l'avatar
-  favoriteTeamId String?
-  role          UserRole @default(USER)
+  id              String   @id @default(cuid())
+  email           String   @unique
+  username        String   @unique
+  password        String   // sera hashé avec bcrypt
+  name            String?
+  avatar          String?  // URL de l'avatar (upload custom plus tard)
+  avatarSeed      String?  // seed pour DiceBear si pas d'upload
+  avatarStyle     String?  // "toon-head" ou "personas"
+  bio             String?  // courte description optionnelle
+  favoriteTeamId  String?
+  favoritePlayer  String?  // nom du joueur favori (texte libre)
+  role            UserRole @default(USER)
   
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
   
   // Relations
-  favoriteTeam  Team?        @relation(fields: [favoriteTeamId], references: [id])
-  predictions   Prediction[]
+  favoriteTeam       Team?            @relation(fields: [favoriteTeamId], references: [id])
+  predictions        Prediction[]
   invitationsCreated InvitationCode[]
   accounts           Account[]
   sessions           Session[]

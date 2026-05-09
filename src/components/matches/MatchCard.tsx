@@ -1,32 +1,34 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useRef, useEffect } from "react"
 import { gsap } from "gsap"
+import { Lightning, Lock } from "@phosphor-icons/react"
 import { ScoreInput } from "./ScoreInput"
 import type { FakeMatchDetailed } from "@/lib/fake-data/matches"
 
+type MatchdayStatus = "past" | "current" | "future"
+
 type MatchCardProps = {
   match: FakeMatchDetailed
-  onPredictionChange?: (matchId: string, home: number, away: number) => void
-  onBancoToggle?: (matchId: string) => void
+  homePrediction: number | null
+  awayPrediction: number | null
+  isBanco: boolean
+  bancoLimitReached: boolean
+  matchdayStatus: MatchdayStatus
+  onPredictionChange: (matchId: string, home: number | null, away: number | null) => void
+  onBancoToggle: (matchId: string) => void
 }
 
 export function MatchCard({
   match,
+  homePrediction,
+  awayPrediction,
+  isBanco,
+  bancoLimitReached,
+  matchdayStatus,
   onPredictionChange,
   onBancoToggle,
 }: MatchCardProps) {
-  // State local — initialisé depuis les props
-  const [homeScore, setHomeScore] = useState<number | null>(
-    match.myHomePrediction ?? null
-  )
-  const [awayScore, setAwayScore] = useState<number | null>(
-    match.myAwayPrediction ?? null
-  )
-  const [isBanco, setIsBanco] = useState(match.isBanco ?? false)
-
-  // Refs pour l'animation SVG du contour banco
-  const cardRef = useRef<HTMLDivElement>(null)
   const rectRef = useRef<SVGRectElement>(null)
 
   // ============================================
@@ -36,24 +38,20 @@ export function MatchCard({
     const rect = rectRef.current
     if (!rect) return
 
-    // Calculer le périmètre total du rectangle
     const length = rect.getTotalLength()
 
-    // Setup initial : pas de trait visible
     gsap.set(rect, {
       strokeDasharray: length,
       strokeDashoffset: length,
     })
 
     if (isBanco) {
-      // Trace le contour dans le sens horaire en 0.7s
       gsap.to(rect, {
         strokeDashoffset: 0,
         duration: 0.7,
         ease: "power2.inOut",
       })
     } else {
-      // Fade out doux quand on désactive
       gsap.to(rect, {
         strokeDashoffset: length,
         duration: 0.4,
@@ -66,74 +64,99 @@ export function MatchCard({
   // HANDLERS
   // ============================================
   const handleHomeChange = (value: number) => {
-    setHomeScore(value)
-    if (awayScore !== null) {
-      onPredictionChange?.(match.id, value, awayScore)
-    }
+    onPredictionChange(match.id, value, awayPrediction)
   }
 
   const handleAwayChange = (value: number) => {
-    setAwayScore(value)
-    if (homeScore !== null) {
-      onPredictionChange?.(match.id, homeScore, value)
-    }
-  }
-
-  const handleBancoToggle = () => {
-    setIsBanco(!isBanco)
-    onBancoToggle?.(match.id)
+    onPredictionChange(match.id, homePrediction, value)
   }
 
   // ============================================
-  // RENDER
+  // LOGIQUE D'ÉTAT
   // ============================================
-  const isLocked = match.status !== "scheduled"
+  // Lecture seule si :
+  // - Journée passée (matchs déjà joués)
+  // - Journée future (pas encore pronostiquable)
+  // - Match individuel verrouillé (kickoff dépassé sur la journée courante)
+  const isReadOnly = matchdayStatus !== "current" || match.status !== "scheduled"
+
+  // Banco visible uniquement sur la journée courante
+  const showBancoToggle = matchdayStatus === "current" && match.status === "scheduled"
+
+  const bancoDisabled = bancoLimitReached && !isBanco
+  const isFinished = match.status === "finished"
 
   return (
-    <div
-      ref={cardRef}
-      className="relative rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-xl overflow-hidden"
-    >
-      {/* SVG pour l'animation tracé banco — par-dessus la card */}
-      <svg
-        className="absolute inset-0 w-full h-full pointer-events-none"
-        style={{ zIndex: 1 }}
-        preserveAspectRatio="none"
-      >
-        <rect
-          ref={rectRef}
-          x="1"
-          y="1"
-          width="calc(100% - 2px)"
-          height="calc(100% - 2px)"
-          rx="16"
-          ry="16"
-          fill="none"
-          stroke="#A8FF00"
-          strokeWidth="2"
-        />
-      </svg>
+    <div className="relative rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-xl overflow-hidden">
 
-      {/* Contenu */}
+      {/* SVG animation tracé banco */}
+<svg
+  className="absolute inset-0 w-full h-full pointer-events-none"
+  style={{ zIndex: 1, overflow: "visible" }}
+  preserveAspectRatio="none"
+>
+  <rect
+    ref={rectRef}
+    x="0"
+    y="0"
+    width="100%"
+    height="100%"
+    rx="16"
+    ry="16"
+    fill="none"
+    stroke="#A8FF00"
+    strokeWidth="2"
+  />
+</svg>
+
       <div className="relative p-5 md:p-6" style={{ zIndex: 2 }}>
 
-        {/* Header : date + toggle banco */}
-        <div className="flex items-center justify-between mb-5">
-          <p className="text-xs uppercase tracking-widest text-text-muted">
-            {match.kickoffDate} · {match.kickoffTime}
-          </p>
+        {/* Header : date + indicateur statut + toggle banco / points */}
+<div className="flex items-center justify-between mb-5 h-8">
+  <p className="text-xs uppercase tracking-widest text-text-muted">
+    {match.kickoffDate} · {match.kickoffTime}
+  </p>
 
-          {!isLocked && (
+          {/* Bouton banco — uniquement sur journée courante avec match scheduled */}
+          {showBancoToggle && (
             <button
               type="button"
-              onClick={handleBancoToggle}
+              onClick={() => onBancoToggle(match.id)}
+              disabled={bancoDisabled}
               className={`
-                text-xs uppercase tracking-widest font-semibold transition-colors
-                ${isBanco ? "text-accent" : "text-text-muted hover:text-text-secondary"}
+                w-8 h-8 rounded-full flex items-center justify-center transition-all
+                ${isBanco
+                  ? "bg-accent text-bg"
+                  : bancoDisabled
+                    ? "bg-white/[0.02] text-text-muted/40 cursor-not-allowed"
+                    : "bg-white/[0.03] text-text-muted hover:bg-white/[0.08] hover:text-accent cursor-pointer"
+                }
               `}
+              aria-label={isBanco ? "Désactiver banco" : "Activer banco"}
+              title={
+                bancoDisabled
+                  ? "Maximum 2 bancos par journée"
+                  : isBanco
+                    ? "Banco activé"
+                    : "Activer le banco (×2 points)"
+              }
             >
-              {isBanco ? "Banco activé" : "Activer banco"}
+              <Lightning size={16} weight={isBanco ? "fill" : "regular"} />
             </button>
+          )}
+
+          {/* Indicateur banco — sur match passé qui était banco */}
+          {isFinished && match.isBanco && (
+            <div className="w-8 h-8 rounded-full bg-accent/20 border border-accent/30 flex items-center justify-center">
+              <Lightning size={14} weight="fill" className="text-accent" />
+            </div>
+          )}
+
+          {/* Indicateur lecture seule — sur journée future */}
+          {matchdayStatus === "future" && (
+            <div className="w-8 h-8 rounded-full bg-white/[0.03] flex items-center justify-center">
+              <Lock size={14} weight="regular" className="text-text-muted" />
+            </div>
           )}
         </div>
 
@@ -150,11 +173,18 @@ export function MatchCard({
               <span className="md:hidden">{match.homeTeam.tla}</span>
             </span>
           </div>
-          <div className="shrink-0">
+          <div className="shrink-0 flex items-center gap-3">
+            {/* Score réel pour matchs terminés */}
+            {isFinished && match.homeScore !== undefined && (
+              <span className="text-3xl md:text-4xl font-black leading-none tabular-nums text-text-primary">
+                {match.homeScore}
+              </span>
+            )}
+            {/* Input prono */}
             <ScoreInput
-              value={homeScore}
+              value={homePrediction}
               onChange={handleHomeChange}
-              disabled={isLocked}
+              disabled={isReadOnly}
             />
           </div>
         </div>
@@ -172,14 +202,38 @@ export function MatchCard({
               <span className="md:hidden">{match.awayTeam.tla}</span>
             </span>
           </div>
-          <div className="shrink-0">
+          <div className="shrink-0 flex items-center gap-3">
+            {isFinished && match.awayScore !== undefined && (
+              <span className="text-3xl md:text-4xl font-black leading-none tabular-nums text-text-primary">
+                {match.awayScore}
+              </span>
+            )}
             <ScoreInput
-              value={awayScore}
+              value={awayPrediction}
               onChange={handleAwayChange}
-              disabled={isLocked}
+              disabled={isReadOnly}
             />
           </div>
         </div>
+
+        {/* Footer points gagnés — pour matchs terminés */}
+        {isFinished && match.myPoints !== undefined && (
+          <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+            <p className="text-xs uppercase tracking-widest text-text-muted">
+              {homePrediction !== null && awayPrediction !== null
+                ? "Mon prono"
+                : "Pas de prono"}
+            </p>
+            <p
+              className={`
+                text-sm font-bold
+                ${match.myPoints > 0 ? "text-accent" : "text-text-muted"}
+              `}
+            >
+              {match.myPoints > 0 ? `+${match.myPoints}` : "0"} pts
+            </p>
+          </div>
+        )}
 
       </div>
     </div>

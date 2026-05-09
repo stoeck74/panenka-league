@@ -98,7 +98,9 @@ export function Sidebar({ username, role }: SidebarProps) {
                 }
               `}
             >
-              <Icon size={22} weight="thin" className="shrink-0" />
+              <span className="shrink-0">
+                  <Icon size={22} weight="thin" />
+              </span>
               <span className={`text-sm font-medium whitespace-nowrap transition-opacity duration-200 ${expanded ? "opacity-100" : "opacity-0"}`}>
                 {item.label}
               </span>
@@ -125,8 +127,10 @@ export function Sidebar({ username, role }: SidebarProps) {
                 }
               `}
             >
-              <Icon size={22} weight="thin" className="shrink-0" />
-              <span className={`text-sm font-medium whitespace-nowrap transition-opacity duration-200 ${expanded ? "opacity-100" : "opacity-0"}`}>
+              <span className="shrink-0">
+              <Icon size={22} weight="thin" />
+            </span>
+                          <span className={`text-sm font-medium whitespace-nowrap transition-opacity duration-200 ${expanded ? "opacity-100" : "opacity-0"}`}>
                 {item.label}
               </span>
             </Link>

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useMemo } from "react"
 import { gsap } from "gsap"
 import { Lightning, ClockCountdown } from "@phosphor-icons/react"
 import { MatchCard } from "./MatchCard"
-import type { FakeMatchDetailed, FakeMatchday } from "@/lib/fake-data/matches"
+import { getMatchesByMatchday, type FakeMatchDetailed, type FakeMatchday } from "@/lib/fake-data/matches"
 
 type MatchsViewProps = {
   matches: FakeMatchDetailed[]
@@ -12,12 +12,48 @@ type MatchsViewProps = {
   currentMatchday: number
 }
 
+const MAX_BANCOS = 2
+
 export function MatchsView({
   matches,
   matchdays,
   currentMatchday,
 }: MatchsViewProps) {
   const [selectedMatchday, setSelectedMatchday] = useState(currentMatchday)
+// Type de la journée sélectionnée
+type MatchdayStatus = "past" | "current" | "future"
+
+const selectedMatchdayInfo = matchdays.find((md) => md.number === selectedMatchday)
+const matchdayStatus: MatchdayStatus = (selectedMatchdayInfo?.status as MatchdayStatus) ?? "future"
+
+// Matchs de la journée sélectionnée (dynamique)
+const displayedMatches = useMemo(
+  () => getMatchesByMatchday(selectedMatchday),
+  [selectedMatchday]
+)
+  // ============================================
+  // STATE GLOBAL DES PRONOS ET BANCOS
+  // ============================================
+  // On stocke les bancos dans un Set d'IDs (super performant pour add/remove/has)
+const [bancoIds, setBancoIds] = useState<Set<string>>(new Set())
+const [predictions, setPredictions] = useState<Map<string, { home: number | null; away: number | null }>>(new Map())
+
+// Quand la journée change, on resync depuis les fake data de cette journée
+useEffect(() => {
+  const newBancoIds = new Set<string>()
+  const newPredictions = new Map<string, { home: number | null; away: number | null }>()
+
+  displayedMatches.forEach((m) => {
+    if (m.isBanco) newBancoIds.add(m.id)
+    newPredictions.set(m.id, {
+      home: m.myHomePrediction ?? null,
+      away: m.myAwayPrediction ?? null,
+    })
+  })
+
+  setBancoIds(newBancoIds)
+  setPredictions(newPredictions)
+}, [displayedMatches])
 
   // Refs pour animations GSAP
   const headerRef = useRef<HTMLDivElement>(null)
@@ -25,19 +61,55 @@ export function MatchsView({
   const cardsRef = useRef<HTMLDivElement>(null)
 
   // ============================================
-  // STATS DE LA JOURNÉE SÉLECTIONNÉE
+  // STATS DE LA JOURNÉE — RÉACTIVES
   // ============================================
-  const stats = useMemo(() => {
-    const total = matches.length
-    const predictionsMade = matches.filter(
-      (m) => m.myHomePrediction !== null && m.myAwayPrediction !== null
-    ).length
-    const bancosUsed = matches.filter((m) => m.isBanco).length
-    return { total, predictionsMade, bancosUsed }
-  }, [matches])
+const stats = useMemo(() => {
+  const total = displayedMatches.length
+  let predictionsMade = 0
+  predictions.forEach((p) => {
+    if (p.home !== null && p.away !== null) predictionsMade++
+  })
+  return {
+    total,
+    predictionsMade,
+    bancosUsed: bancoIds.size,
+    maxBancos: MAX_BANCOS,
+  }
+}, [predictions, bancoIds, displayedMatches])
 
   // ============================================
-  // ANIMATION GSAP — Entrée stagger au load
+  // HANDLERS — Modification du state global
+  // ============================================
+  const handlePredictionChange = (
+    matchId: string,
+    home: number | null,
+    away: number | null
+  ) => {
+    setPredictions((prev) => {
+      const next = new Map(prev)
+      next.set(matchId, { home, away })
+      return next
+    })
+  }
+
+  const handleBancoToggle = (matchId: string) => {
+    setBancoIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(matchId)) {
+        next.delete(matchId)
+      } else {
+        // Bloque si déjà 2 bancos
+        if (next.size >= MAX_BANCOS) {
+          return prev // Pas de changement
+        }
+        next.add(matchId)
+      }
+      return next
+    })
+  }
+
+  // ============================================
+  // ANIMATION GSAP — Entrée stagger
   // ============================================
   useEffect(() => {
     const header = headerRef.current
@@ -46,12 +118,10 @@ export function MatchsView({
 
     if (!header || !tabs || !cards) return
 
-    // Reset initial : tout invisible et légèrement décalé
     const elements = [header, tabs, ...cards.children]
 
     gsap.set(elements, { opacity: 0, y: 24 })
 
-    // Animation stagger : un par un avec un léger décalage
     gsap.to(elements, {
       opacity: 1,
       y: 0,
@@ -66,12 +136,10 @@ export function MatchsView({
   // RENDER
   // ============================================
   return (
-    <div className="p-4 md:p-6 lg:p-8 bg-matches">
+    <div className="p-4 md:p-6 lg:p-8">
       <div className="max-w-[1400px] mx-auto">
 
-        {/* ============================================
-            HEADER DE PAGE
-            ============================================ */}
+        {/* HEADER */}
         <header ref={headerRef} className="mb-8">
           <p className="text-xs uppercase tracking-widest text-text-muted mb-2">
             Pronostics
@@ -88,7 +156,6 @@ export function MatchsView({
 
             {/* Stats à droite */}
             <div className="flex items-center gap-6">
-              {/* Pronos faits */}
               <div>
                 <p className="text-xs uppercase tracking-widest text-text-muted mb-1">
                   Pronos
@@ -101,7 +168,6 @@ export function MatchsView({
                 </p>
               </div>
 
-              {/* Bancos */}
               <div>
                 <p className="text-xs uppercase tracking-widest text-text-muted mb-1 flex items-center gap-1">
                   <Lightning size={12} weight="fill" />
@@ -110,12 +176,11 @@ export function MatchsView({
                 <p className="text-2xl font-black text-accent">
                   {stats.bancosUsed}
                   <span className="text-text-muted text-base font-normal ml-1">
-                    / 2
+                    / {stats.maxBancos}
                   </span>
                 </p>
               </div>
 
-              {/* Compte à rebours */}
               <div className="hidden lg:block">
                 <p className="text-xs uppercase tracking-widest text-text-muted mb-1 flex items-center gap-1">
                   <ClockCountdown size={12} weight="bold" />
@@ -129,9 +194,7 @@ export function MatchsView({
           </div>
         </header>
 
-        {/* ============================================
-            SÉLECTEUR DE JOURNÉE — Pills scrollables
-            ============================================ */}
+        {/* SÉLECTEUR DE JOURNÉE */}
         <div ref={tabsRef} className="mb-8 -mx-4 md:mx-0">
           <div className="flex gap-2 overflow-x-auto pb-2 px-4 md:px-0 scrollbar-hide">
             {matchdays.map((md) => (
@@ -156,18 +219,34 @@ export function MatchsView({
           </div>
         </div>
 
-        {/* ============================================
-            LISTE DES MATCHS
-            ============================================ */}
-        <div
-          ref={cardsRef}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-
-        >
-          {matches.map((match) => (
-            <MatchCard key={match.id} match={match} />
-          ))}
-        </div>
+        {/* LISTE DES MATCHS */}
+<div
+  ref={cardsRef}
+  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+>
+  {displayedMatches.length === 0 ? (
+    <div className="col-span-full rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-xl p-12 text-center text-text-muted">
+      Aucun match disponible pour cette journée
+    </div>
+  ) : (
+    displayedMatches.map((match) => {
+      const prediction = predictions.get(match.id) ?? { home: null, away: null }
+      return (
+        <MatchCard
+          key={match.id}
+          match={match}
+          homePrediction={prediction.home}
+          awayPrediction={prediction.away}
+          isBanco={bancoIds.has(match.id)}
+          bancoLimitReached={bancoIds.size >= MAX_BANCOS && !bancoIds.has(match.id)}
+          matchdayStatus={matchdayStatus}
+          onPredictionChange={handlePredictionChange}
+          onBancoToggle={handleBancoToggle}
+        />
+      )
+    })
+  )}
+</div>
 
       </div>
     </div>

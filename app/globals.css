@@ -181,3 +181,59 @@ body {
   background-repeat: no-repeat;
   filter: brightness(0.15) contrast(1);
 }
+
+
+.bg-user {
+  position: relative;
+  isolation: isolate;
+}
+
+.tou::before { background-image: url('/team/tou.webp'); }
+.bre::before { background-image: url('/team/bre.webp'); }
+.mar::before { background-image: url('/team/mar.webp'); }
+.aja::before { background-image: url('/team/aja.webp'); }
+.lil::before { background-image: url('/team/lil.webp'); }
+.nic::before { background-image: url('/team/nic.webp'); }
+.lyo::before { background-image: url('/team/lyo.webp'); }
+.psg::before { background-image: url('/team/psg.webp'); }
+.fcl::before { background-image: url('/team/fcl.webp'); }
+.ren::before { background-image: url('/team/ren.webp'); }
+.ang::before { background-image: url('/team/ang.webp'); }
+.hac::before { background-image: url('/team/hac.webp'); }
+.nan::before { background-image: url('/team/nan.webp'); }
+.fcm::before { background-image: url('/team/fcm.webp'); }
+.rcl::before { background-image: url('/team/rcl.webp'); }
+.asm::before { background-image: url('/team/asm.webp'); }
+.rc::before  { background-image: url('/team/rc.webp'); }
+.pfc::before { background-image: url('/team/pfc.webp'); }
+
+.bg-user::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: brightness(0.30) contrast(1);
+}
+
+.bg-user::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    to right,
+    rgba(10, 10, 10, 0.95) 0%,
+    rgba(10, 10, 10, 0.7) 40%,
+    rgba(10, 10, 10, 0.3) 100%
+  );
+}
+@media (max-width: 768px) {
+  .bg-user::after {
+    background: rgba(10, 10, 10, 0.85); /* uniforme */
+  }
+}
+
+

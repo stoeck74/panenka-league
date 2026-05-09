@@ -20,7 +20,7 @@ export default async function DashboardPage() {
   if (!session) return null
 
  return (
-  <div className="relative bg-dashboard min-h-screen p-4 md:p-6 lg:p-8 overflow-hidden">
+<div className="relative bg-dashboard h-full p-4 md:p-6 lg:p-8 overflow-hidden">
     <div className="max-w-[1400px] mx-auto">
 
     {/* ============================================
