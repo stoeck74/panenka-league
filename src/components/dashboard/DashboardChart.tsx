@@ -58,7 +58,7 @@ const trends: TrendConfig[] = [
     description: "Position dans le classement",
     type: "line",
     color: "#A8FF00",
-    yAxisInverted: true,
+    yAxisInverted: false,
   },
   {
     key: "cumulative",

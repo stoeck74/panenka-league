@@ -30,13 +30,29 @@ export async function recalculatePoints(
   matchIds?: string[],
 ): Promise<RecalculateResult> {
   try {
-    // 1. Récupérer les matchs concernés (FINISHED + score connu)
+ // 1. Récupérer les matchs concernés (FINISHED + score connu)
+    // Si pas de matchIds explicites → on limite à la saison active uniquement
+    // (sinon on recalculerait inutilement les saisons passées)
+    let seasonFilter = {}
+    if (!matchIds || matchIds.length === 0) {
+      const activeSeason = await prisma.season.findFirst({
+        where: { isActive: true },
+        select: { id: true },
+      })
+      if (!activeSeason) {
+        return { ok: true, matchesProcessed: 0, predictionsUpdated: 0 }
+      }
+      seasonFilter = { matchday: { seasonId: activeSeason.id } }
+    }
+
     const matches = await prisma.match.findMany({
       where: {
         status: "FINISHED",
         homeScore: { not: null },
         awayScore: { not: null },
-        ...(matchIds && matchIds.length > 0 ? { id: { in: matchIds } } : {}),
+        ...(matchIds && matchIds.length > 0
+          ? { id: { in: matchIds } }
+          : seasonFilter),
       },
       select: {
         id: true,
