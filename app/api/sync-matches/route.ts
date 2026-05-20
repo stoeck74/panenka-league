@@ -83,36 +83,44 @@ export async function GET(request: NextRequest) {
     // ============================================
     // ÉTAPE 2 — Équipes
     // ============================================
-    const apiTeams = await fetchTeams()
-    let teamsUpserted = 0
-    for (const apiTeam of apiTeams) {
-      const team = await prisma.team.upsert({
-        where: { externalId: apiTeam.id },
-        create: {
-          externalId: apiTeam.id,
-          name: apiTeam.name,
-          shortName: apiTeam.shortName,
-          tla: apiTeam.tla,
-          crestUrl: apiTeam.crest,
-        },
-        update: {
-          name: apiTeam.name,
-          shortName: apiTeam.shortName,
-          tla: apiTeam.tla,
-          crestUrl: apiTeam.crest,
-        },
-      })
+ const apiTeams = await fetchTeams()
 
-      // Lien SeasonTeam (idempotent)
-      await prisma.seasonTeam.upsert({
-        where: { seasonId_teamId: { seasonId: season.id, teamId: team.id } },
-        create: { seasonId: season.id, teamId: team.id },
-        update: {},
-      })
+    // Batch upsert des Teams en une seule transaction
+    const upsertedTeams = await prisma.$transaction(
+      apiTeams.map((apiTeam) =>
+        prisma.team.upsert({
+          where: { externalId: apiTeam.id },
+          create: {
+            externalId: apiTeam.id,
+            name: apiTeam.name,
+            shortName: apiTeam.shortName,
+            tla: apiTeam.tla,
+            crestUrl: apiTeam.crest,
+          },
+          update: {
+            name: apiTeam.name,
+            shortName: apiTeam.shortName,
+            tla: apiTeam.tla,
+            crestUrl: apiTeam.crest,
+          },
+        }),
+      ),
+      { timeout: 30000 },
+    )
 
-      teamsUpserted++
-    }
-    log.push(`✓ ${teamsUpserted} équipes synchronisées`)
+    // Batch upsert des liens SeasonTeam (idempotent)
+    await prisma.$transaction(
+      upsertedTeams.map((team) =>
+        prisma.seasonTeam.upsert({
+          where: { seasonId_teamId: { seasonId: season.id, teamId: team.id } },
+          create: { seasonId: season.id, teamId: team.id },
+          update: {},
+        }),
+      ),
+      { timeout: 30000 },
+    )
+
+    log.push(`✓ ${upsertedTeams.length} équipes synchronisées`)
 
     // ============================================
     // ÉTAPE 3 — Matchs + Matchdays
@@ -138,91 +146,118 @@ export async function GET(request: NextRequest) {
       matchesByMatchday.set(m.matchday, list)
     }
 
-    let matchdaysUpserted = 0
+let matchdaysUpserted = 0
     let matchesUpserted = 0
     let matchesNewlyFinished = 0
-    // IDs des matchs qui viennent de passer en FINISHED — pour recalcul ciblé
     const newlyFinishedMatchIds: string[] = []
 
-    for (const [matchdayNumber, mdMatches] of matchesByMatchday) {
-      const sortedKickoffs = mdMatches
-        .map((m) => new Date(m.utcDate))
-        .sort((a, b) => a.getTime() - b.getTime())
-      const startDate = sortedKickoffs[0]
-      const endDate = sortedKickoffs[sortedKickoffs.length - 1]
-      const mdStatus = deriveMatchdayStatus(
-        mdMatches.map((m) => ({
-          status: mapMatchStatus(m.status),
-          kickoffAt: new Date(m.utcDate),
-        }))
-      )
+    // PHASE 1 : batch upsert toutes les Matchdays en parallèle
+    const matchdayUpsertOps = Array.from(matchesByMatchday.entries()).map(
+      ([matchdayNumber, mdMatches]) => {
+        const sortedKickoffs = mdMatches
+          .map((m) => new Date(m.utcDate))
+          .sort((a, b) => a.getTime() - b.getTime())
+        const startDate = sortedKickoffs[0]
+        const endDate = sortedKickoffs[sortedKickoffs.length - 1]
+        const mdStatus = deriveMatchdayStatus(
+          mdMatches.map((m) => ({
+            status: mapMatchStatus(m.status),
+            kickoffAt: new Date(m.utcDate),
+          })),
+        )
 
-      const matchday = await prisma.matchday.upsert({
-        where: {
-          seasonId_number: { seasonId: season.id, number: matchdayNumber },
-        },
-        create: {
-          seasonId: season.id,
-          number: matchdayNumber,
-          status: mdStatus,
-          startDate,
-          endDate,
-        },
-        update: {
-          status: mdStatus,
-          startDate,
-          endDate,
-        },
-      })
-      matchdaysUpserted++
+        return prisma.matchday.upsert({
+          where: {
+            seasonId_number: { seasonId: season.id, number: matchdayNumber },
+          },
+          create: {
+            seasonId: season.id,
+            number: matchdayNumber,
+            status: mdStatus,
+            startDate,
+            endDate,
+          },
+          update: { status: mdStatus, startDate, endDate },
+        })
+      },
+    )
+    const upsertedMatchdays = await prisma.$transaction(matchdayUpsertOps, {
+      timeout: 30000,
+    })
+    matchdaysUpserted = upsertedMatchdays.length
+
+    // Map matchdayNumber → matchdayId pour réutilisation
+    const matchdayIdByNumber = new Map(
+      upsertedMatchdays.map((md) => [md.number, md.id]),
+    )
+
+    // PHASE 2 : préparer les opérations de match en collectant les "justFinished"
+    const matchUpsertOps: Array<{
+      apiMatchId: number
+      justFinished: boolean
+      op: ReturnType<typeof prisma.match.upsert>
+    }> = []
+
+    for (const [matchdayNumber, mdMatches] of matchesByMatchday) {
+      const matchdayId = matchdayIdByNumber.get(matchdayNumber)
+      if (!matchdayId) continue
 
       for (const apiMatch of mdMatches) {
         const homeTeamId = teamIdByExternalId.get(apiMatch.homeTeam.id)
         const awayTeamId = teamIdByExternalId.get(apiMatch.awayTeam.id)
-        if (!homeTeamId || !awayTeamId) {
-          continue
-        }
+        if (!homeTeamId || !awayTeamId) continue
 
         const newStatus = mapMatchStatus(apiMatch.status)
 
-        // Détecte les matchs qui viennent de passer en FINISHED
         const previousStatus = statusByExternalId.get(apiMatch.id)
         const justFinished =
-          previousStatus &&
+          !!previousStatus &&
           previousStatus !== "FINISHED" &&
           newStatus === "FINISHED"
-        if (justFinished) {
-          matchesNewlyFinished++
-        }
+        if (justFinished) matchesNewlyFinished++
 
-        const upserted = await prisma.match.upsert({
-          where: { externalId: apiMatch.id },
-          create: {
-            externalId: apiMatch.id,
-            matchdayId: matchday.id,
-            homeTeamId,
-            awayTeamId,
-            kickoffAt: new Date(apiMatch.utcDate),
-            status: newStatus,
-            homeScore: apiMatch.score.fullTime.home,
-            awayScore: apiMatch.score.fullTime.away,
-          },
-          update: {
-            matchdayId: matchday.id,
-            homeTeamId,
-            awayTeamId,
-            kickoffAt: new Date(apiMatch.utcDate),
-            status: newStatus,
-            homeScore: apiMatch.score.fullTime.home,
-            awayScore: apiMatch.score.fullTime.away,
-          },
+        matchUpsertOps.push({
+          apiMatchId: apiMatch.id,
+          justFinished,
+          op: prisma.match.upsert({
+            where: { externalId: apiMatch.id },
+            create: {
+              externalId: apiMatch.id,
+              matchdayId,
+              homeTeamId,
+              awayTeamId,
+              kickoffAt: new Date(apiMatch.utcDate),
+              status: newStatus,
+              homeScore: apiMatch.score.fullTime.home,
+              awayScore: apiMatch.score.fullTime.away,
+            },
+            update: {
+              matchdayId,
+              homeTeamId,
+              awayTeamId,
+              kickoffAt: new Date(apiMatch.utcDate),
+              status: newStatus,
+              homeScore: apiMatch.score.fullTime.home,
+              awayScore: apiMatch.score.fullTime.away,
+            },
+          }),
         })
-        if (justFinished) {
-          newlyFinishedMatchIds.push(upserted.id)
-        }
-        matchesUpserted++
       }
     }
+
+    // PHASE 3 : batch upsert tous les matchs en une seule transaction
+    const upsertedMatches = await prisma.$transaction(
+      matchUpsertOps.map((m) => m.op),
+      { timeout: 30000 },
+    )
+
+    // PHASE 4 : extrait les IDs des newly FINISHED depuis les résultats
+    for (let i = 0; i < upsertedMatches.length; i++) {
+      if (matchUpsertOps[i].justFinished) {
+        newlyFinishedMatchIds.push(upsertedMatches[i].id)
+      }
+    }
+    matchesUpserted = upsertedMatches.length
 // ============================================
 // ÉTAPE 5 — Top buteurs
 // À AJOUTER DANS app/api/sync-matches/route.ts
@@ -232,38 +267,36 @@ export async function GET(request: NextRequest) {
 //   import { ..., fetchScorers } from "@/lib/football-data"
 // ============================================
 
-    // Récupérer le top 15 buteurs
+ // Récupérer le top 15 buteurs
     const apiScorers = await fetchScorers(15)
-    let scorersUpserted = 0
 
-    for (let i = 0; i < apiScorers.length; i++) {
-      const apiScorer = apiScorers[i]
-      const teamId = teamIdByExternalId.get(apiScorer.team.id)
-      if (!teamId) continue
-
-      await prisma.scorer.upsert({
-        where: { externalId: apiScorer.player.id },
-        create: {
-          externalId: apiScorer.player.id,
-          name: apiScorer.player.name,
-          seasonId: season.id,
-          teamId,
-          goals: apiScorer.goals,
-          rank: i + 1,
-        },
-        update: {
-          name: apiScorer.player.name,
-          teamId,
-          goals: apiScorer.goals,
-          rank: i + 1,
-        },
+    // Construire les ops d'upsert (filtre les buteurs dont la team n'est pas mappée)
+    const scorerOps = apiScorers
+      .map((apiScorer, i) => {
+        const teamId = teamIdByExternalId.get(apiScorer.team.id)
+        if (!teamId) return null
+        return prisma.scorer.upsert({
+          where: { externalId: apiScorer.player.id },
+          create: {
+            externalId: apiScorer.player.id,
+            name: apiScorer.player.name,
+            seasonId: season.id,
+            teamId,
+            goals: apiScorer.goals,
+            rank: i + 1,
+          },
+          update: {
+            name: apiScorer.player.name,
+            teamId,
+            goals: apiScorer.goals,
+            rank: i + 1,
+          },
+        })
       })
-      scorersUpserted++
-    }
-    log.push(`✓ ${scorersUpserted} buteurs synchronisés`)
-    log.push(
-      `✓ ${matchdaysUpserted} journées + ${matchesUpserted} matchs synchronisés (${matchesNewlyFinished} nouveaux terminés)`
-    )
+      .filter((op): op is NonNullable<typeof op> => op !== null)
+
+    await prisma.$transaction(scorerOps, { timeout: 30000 })
+    log.push(`✓ ${scorerOps.length} buteurs synchronisés`)
 
 // ============================================
     // ÉTAPE 6 — Recalcul des points
