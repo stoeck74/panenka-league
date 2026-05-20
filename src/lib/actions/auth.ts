@@ -93,6 +93,9 @@ export async function registerAction(formData: FormData) {
         email,
         username,
         password: hashedPassword,
+        // Avatar DiceBear par défaut
+        avatarStyle: "personas",
+        avatarSeed: username,
       },
     })
 
@@ -110,7 +113,7 @@ export async function registerAction(formData: FormData) {
     await signIn("credentials", {
       email,
       password,
-      redirectTo: "/dashboard",
+      redirectTo: "/aide",
     })
   } catch (error) {
     if (error instanceof AuthError) {

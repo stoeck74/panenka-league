@@ -67,7 +67,7 @@ return (
       <div
         key={index}
         data-word
-        className="absolute inset-0 flex items-center justify-center md:justify-start"
+        className="absolute inset-0 flex items-start justify-start md:justify-start"
         style={{
           // Le premier mot est visible par défaut, les autres cachés au-dessus
           transform: index === 0 ? "translateY(0)" : `translateY(-100%)`,

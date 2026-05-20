@@ -1,14 +1,16 @@
 "use client"
 
-import { useState, useRef, useEffect, useMemo } from "react"
+import { useState, useRef, useEffect, useMemo, useTransition } from "react"
 import { gsap } from "gsap"
 import { Lightning, ClockCountdown } from "@phosphor-icons/react"
+import { toast } from "sonner"
 import { MatchCard } from "./MatchCard"
-import { getMatchesByMatchday, type FakeMatchDetailed, type FakeMatchday } from "@/lib/fake-data/matches"
+import type { ViewMatch, ViewMatchday } from "@/lib/matches-data"
+import { savePrediction, toggleBanco } from "@/lib/actions/predictions"
 
 type MatchsViewProps = {
-  matches: FakeMatchDetailed[]
-  matchdays: FakeMatchday[]
+  matches: ViewMatch[]
+  matchdays: ViewMatchday[]
   currentMatchday: number
 }
 
@@ -20,91 +22,139 @@ export function MatchsView({
   currentMatchday,
 }: MatchsViewProps) {
   const [selectedMatchday, setSelectedMatchday] = useState(currentMatchday)
-// Type de la journée sélectionnée
-type MatchdayStatus = "past" | "current" | "future"
+  const [, startTransition] = useTransition()
 
-const selectedMatchdayInfo = matchdays.find((md) => md.number === selectedMatchday)
-const matchdayStatus: MatchdayStatus = (selectedMatchdayInfo?.status as MatchdayStatus) ?? "future"
+  type MatchdayStatus = "past" | "current" | "future"
 
-// Matchs de la journée sélectionnée (dynamique)
-const displayedMatches = useMemo(
-  () => getMatchesByMatchday(selectedMatchday),
-  [selectedMatchday]
-)
+  const selectedMatchdayInfo = matchdays.find((md) => md.number === selectedMatchday)
+  const matchdayStatus: MatchdayStatus = selectedMatchdayInfo?.status ?? "future"
+
+  const displayedMatches = useMemo(
+    () => matches.filter((m) => m.matchdayNumber === selectedMatchday),
+    [matches, selectedMatchday]
+  )
+
   // ============================================
   // STATE GLOBAL DES PRONOS ET BANCOS
   // ============================================
-  // On stocke les bancos dans un Set d'IDs (super performant pour add/remove/has)
-const [bancoIds, setBancoIds] = useState<Set<string>>(new Set())
-const [predictions, setPredictions] = useState<Map<string, { home: number | null; away: number | null }>>(new Map())
+  // Initialisé depuis la prop `matches` (qui contient les pronos serveur).
+  // À chaque modif, on optimistic-update le state puis on call la server
+  // action. Si elle fail, on rollback.
+  const [bancoIds, setBancoIds] = useState<Set<string>>(new Set())
+  const [predictions, setPredictions] = useState<
+    Map<string, { home: number | null; away: number | null }>
+  >(new Map())
 
-// Quand la journée change, on resync depuis les fake data de cette journée
-useEffect(() => {
-  const newBancoIds = new Set<string>()
-  const newPredictions = new Map<string, { home: number | null; away: number | null }>()
+  // Re-sync depuis les props quand la journée change (ou que matches change après revalidate)
+  useEffect(() => {
+    const newBancoIds = new Set<string>()
+    const newPredictions = new Map<string, { home: number | null; away: number | null }>()
 
-  displayedMatches.forEach((m) => {
-    if (m.isBanco) newBancoIds.add(m.id)
-    newPredictions.set(m.id, {
-      home: m.myHomePrediction ?? null,
-      away: m.myAwayPrediction ?? null,
+    displayedMatches.forEach((m) => {
+      if (m.isBanco) newBancoIds.add(m.id)
+      newPredictions.set(m.id, {
+        home: m.myHomePrediction ?? null,
+        away: m.myAwayPrediction ?? null,
+      })
     })
-  })
 
-  setBancoIds(newBancoIds)
-  setPredictions(newPredictions)
-}, [displayedMatches])
+    setBancoIds(newBancoIds)
+    setPredictions(newPredictions)
+  }, [displayedMatches])
 
-  // Refs pour animations GSAP
+  // Refs animations GSAP
   const headerRef = useRef<HTMLDivElement>(null)
   const tabsRef = useRef<HTMLDivElement>(null)
   const cardsRef = useRef<HTMLDivElement>(null)
 
   // ============================================
-  // STATS DE LA JOURNÉE — RÉACTIVES
+  // STATS
   // ============================================
-const stats = useMemo(() => {
-  const total = displayedMatches.length
-  let predictionsMade = 0
-  predictions.forEach((p) => {
-    if (p.home !== null && p.away !== null) predictionsMade++
-  })
-  return {
-    total,
-    predictionsMade,
-    bancosUsed: bancoIds.size,
-    maxBancos: MAX_BANCOS,
-  }
-}, [predictions, bancoIds, displayedMatches])
+  const stats = useMemo(() => {
+    const total = displayedMatches.length
+    let predictionsMade = 0
+    predictions.forEach((p) => {
+      if (p.home !== null && p.away !== null) predictionsMade++
+    })
+    return {
+      total,
+      predictionsMade,
+      bancosUsed: bancoIds.size,
+      maxBancos: MAX_BANCOS,
+    }
+  }, [predictions, bancoIds, displayedMatches])
 
   // ============================================
-  // HANDLERS — Modification du state global
+  // HANDLER PRONO : optimistic update + server action + rollback si erreur
   // ============================================
   const handlePredictionChange = (
     matchId: string,
     home: number | null,
     away: number | null
   ) => {
+    // Optimistic : mise à jour immédiate du state local
+    const previous = predictions.get(matchId) ?? { home: null, away: null }
     setPredictions((prev) => {
       const next = new Map(prev)
       next.set(matchId, { home, away })
       return next
     })
+
+    // On ne persist que si les deux côtés sont définis
+    // (cas impossible avec l'auto-fill ?? 0 dans MatchCard, mais ceinture+bretelles)
+    if (home === null || away === null) return
+
+    startTransition(async () => {
+      const result = await savePrediction(matchId, home, away)
+      if (!result.ok) {
+        // Rollback du state local
+        setPredictions((prev) => {
+          const next = new Map(prev)
+          next.set(matchId, previous)
+          return next
+        })
+        toast.error(result.error ?? "Impossible de sauvegarder")
+      } else {
+        toast.success("Prono enregistré")
+      }
+    })
   }
 
+  // ============================================
+  // HANDLER BANCO : optimistic update + server action + rollback
+  // ============================================
   const handleBancoToggle = (matchId: string) => {
+    const wasBanco = bancoIds.has(matchId)
+    const willBeBanco = !wasBanco
+
+    // Limite côté UI (server check aussi)
+    if (willBeBanco && bancoIds.size >= MAX_BANCOS) {
+      toast.error(`Maximum ${MAX_BANCOS} bancos par journée`)
+      return
+    }
+
+    // Optimistic
     setBancoIds((prev) => {
       const next = new Set(prev)
-      if (next.has(matchId)) {
-        next.delete(matchId)
-      } else {
-        // Bloque si déjà 2 bancos
-        if (next.size >= MAX_BANCOS) {
-          return prev // Pas de changement
-        }
-        next.add(matchId)
-      }
+      if (willBeBanco) next.add(matchId)
+      else next.delete(matchId)
       return next
+    })
+
+    startTransition(async () => {
+      const result = await toggleBanco(matchId, willBeBanco)
+      if (!result.ok) {
+        // Rollback
+        setBancoIds((prev) => {
+          const next = new Set(prev)
+          if (wasBanco) next.add(matchId)
+          else next.delete(matchId)
+          return next
+        })
+        toast.error(result.error ?? "Impossible de basculer le banco")
+      } else {
+        toast.success(willBeBanco ? "Banco activé" : "Banco désactivé")
+      }
     })
   }
 
@@ -136,10 +186,9 @@ const stats = useMemo(() => {
   // RENDER
   // ============================================
   return (
-    <div className="p-4 md:p-6 lg:p-8">
-      <div className="max-w-[1400px] mx-auto">
+    <div className="p-4 md:p-6 lg:p-8 w-full">
 
-        {/* HEADER */}
+
         <header ref={headerRef} className="mb-8">
           <p className="text-xs uppercase tracking-widest text-text-muted mb-2">
             Pronostics
@@ -154,7 +203,6 @@ const stats = useMemo(() => {
               </p>
             </div>
 
-            {/* Stats à droite */}
             <div className="flex items-center gap-6">
               <div>
                 <p className="text-xs uppercase tracking-widest text-text-muted mb-1">
@@ -194,7 +242,6 @@ const stats = useMemo(() => {
           </div>
         </header>
 
-        {/* SÉLECTEUR DE JOURNÉE */}
         <div ref={tabsRef} className="mb-8 -mx-4 md:mx-0">
           <div className="flex gap-2 overflow-x-auto pb-2 px-4 md:px-0 scrollbar-hide">
             {matchdays.map((md) => (
@@ -219,36 +266,35 @@ const stats = useMemo(() => {
           </div>
         </div>
 
-        {/* LISTE DES MATCHS */}
-<div
-  ref={cardsRef}
-  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
->
-  {displayedMatches.length === 0 ? (
-    <div className="col-span-full rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-xl p-12 text-center text-text-muted">
-      Aucun match disponible pour cette journée
-    </div>
-  ) : (
-    displayedMatches.map((match) => {
-      const prediction = predictions.get(match.id) ?? { home: null, away: null }
-      return (
-        <MatchCard
-          key={match.id}
-          match={match}
-          homePrediction={prediction.home}
-          awayPrediction={prediction.away}
-          isBanco={bancoIds.has(match.id)}
-          bancoLimitReached={bancoIds.size >= MAX_BANCOS && !bancoIds.has(match.id)}
-          matchdayStatus={matchdayStatus}
-          onPredictionChange={handlePredictionChange}
-          onBancoToggle={handleBancoToggle}
-        />
-      )
-    })
-  )}
-</div>
+        <div
+          ref={cardsRef}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+        >
+          {displayedMatches.length === 0 ? (
+            <div className="col-span-full rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-xl p-12 text-center text-text-muted">
+              Aucun match disponible pour cette journée
+            </div>
+          ) : (
+            displayedMatches.map((match) => {
+              const prediction = predictions.get(match.id) ?? { home: null, away: null }
+              return (
+                <MatchCard
+                  key={match.id}
+                  match={match}
+                  homePrediction={prediction.home}
+                  awayPrediction={prediction.away}
+                  isBanco={bancoIds.has(match.id)}
+                  bancoLimitReached={bancoIds.size >= MAX_BANCOS && !bancoIds.has(match.id)}
+                  matchdayStatus={matchdayStatus}
+                  onPredictionChange={handlePredictionChange}
+                  onBancoToggle={handleBancoToggle}
+                />
+              )
+            })
+          )}
+        </div>
 
       </div>
-    </div>
+
   )
 }

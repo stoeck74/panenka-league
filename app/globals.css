@@ -9,7 +9,7 @@
   /* Texte */
   --color-text-primary: #F5F5F5;
   --color-text-secondary: #9CA3AF;
-  --color-text-muted: #525252;
+  --color-text-muted: #727272;
   
   /* Accent chartreuse */
   --color-accent: #A8FF00;
@@ -131,24 +131,72 @@ body {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  filter: grayscale(1) brightness(0.3) contrast(1.2);
+  filter: grayscale(1) brightness(0.2) contrast(1.1);
+}
+
+.ntsc-effect {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+
+  /* 1. Les Scanlines (Lignes de balayage) */
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%, 
+    rgba(0, 0, 0, 0.25) 50%
+  );
+  background-size: 100% 4px;  
+  
+  /* 2. Le Grain NTSC (Généré en SVG pour éviter le lien mort) */
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: 0.05; /* Ajuste l'intensité du grain ici */
+    /* Ce SVG crée un bruit aléatoire parfait */
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    animation: noise-anim 0.2s steps(1) infinite;
+  } 
+
+  /* 3. Vignettage (Bords sombres) */
+  box-shadow: inset 0 0 120px rgba(0,0,0,0.75);
+}
+
+/* Animation pour faire vibrer le grain */
+@keyframes noise-anim {
+  0% { transform: translate(0,0); }
+  25% { transform: translate(-1%, -1%); }
+  50% { transform: translate(1%, 1%); }
+  75% { transform: translate(-1%, 1%); }
+  100% { transform: translate(1%, -1%);
+  }
+}
+
+@keyframes flicker {
+  0% { opacity: 0.97; }
+  50% { opacity: 1; }
+  100% { opacity: 0.98; }
 }
 
 .bg-home {
-  position: relative;
-  isolation: isolate;
+  position: relative; /* Indispensable pour que le gradient se place par rapport à lui */
+  overflow: hidden;
 }
 
-.bg-home::before {
+.bg-home::after {
   content: "";
   position: absolute;
-  inset: 0;
-  z-index: -1;
-  background-image: url('/home.jpg');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  filter: brightness(0.6) contrast(1);
+  bottom: 0; /* On le colle en bas */
+  left: 0;
+  right: 0;
+  height: 400px; /* Ta hauteur souhaitée */
+  z-index: 10; /* Doit être au-dessus de l'image (z-0) */
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(10, 10, 10, 0.5) 40%, 
+    #0a0a0a 100%
+  );
 }
 
 /* ============================================
@@ -188,24 +236,6 @@ body {
   isolation: isolate;
 }
 
-.tou::before { background-image: url('/team/tou.webp'); }
-.bre::before { background-image: url('/team/bre.webp'); }
-.mar::before { background-image: url('/team/mar.webp'); }
-.aja::before { background-image: url('/team/aja.webp'); }
-.lil::before { background-image: url('/team/lil.webp'); }
-.nic::before { background-image: url('/team/nic.webp'); }
-.lyo::before { background-image: url('/team/lyo.webp'); }
-.psg::before { background-image: url('/team/psg.webp'); }
-.fcl::before { background-image: url('/team/fcl.webp'); }
-.ren::before { background-image: url('/team/ren.webp'); }
-.ang::before { background-image: url('/team/ang.webp'); }
-.hac::before { background-image: url('/team/hac.webp'); }
-.nan::before { background-image: url('/team/nan.webp'); }
-.fcm::before { background-image: url('/team/fcm.webp'); }
-.rcl::before { background-image: url('/team/rcl.webp'); }
-.asm::before { background-image: url('/team/asm.webp'); }
-.rc::before  { background-image: url('/team/rc.webp'); }
-.pfc::before { background-image: url('/team/pfc.webp'); }
 
 .bg-user::before {
   content: "";
@@ -234,6 +264,135 @@ body {
   .bg-user::after {
     background: rgba(10, 10, 10, 0.85); /* uniforme */
   }
+} 
+
+
+.bg-resultats {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+}
+
+.bg-resultats::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: url('/resultats.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: brightness(0.2) contrast(1); 
+}
+
+.bg-resultats::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    to top,
+    rgba(10, 10, 10, 0.95) 0%,
+    rgba(10, 10, 10, 0.7) 40%,
+    rgba(10, 10, 10, 0.3) 100%
+  );
+}
+@media (max-width: 768px) {
+  .bg-resultats::after {
+    background: rgba(10, 10, 10, 0.85); /* uniforme */
+  }
 }
 
 
+.bg-joueurs {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+}
+
+.bg-joueurs::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: url('/joueurs.jpg'); 
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: brightness(0.4) contrast(1); 
+}
+
+.bg-joueurs::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    to top,
+    rgba(10, 10, 10, 0.95) 0%,
+    rgba(10, 10, 10, 0.7) 40%,
+    rgba(10, 10, 10, 0.3) 100%
+  );
+}
+@media (max-width: 768px) {
+  .bg-joueurs::after {
+    background: rgba(10, 10, 10, 0.85); /* uniforme */
+  }
+}
+
+.bg-aide {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+}
+
+.bg-aide::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: url('/aide.jpg'); 
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: brightness(0.2) contrast(1); 
+}
+
+.bg-aide::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    to top,
+    rgba(10, 10, 10, 0.95) 0%,
+    rgba(10, 10, 10, 0.7) 40%,
+    rgba(10, 10, 10, 0.3) 100%
+  );
+}
+@media (max-width: 768px) {
+  .bg-aide::after {
+    background: rgba(10, 10, 10, 0.85); /* uniforme */
+  }
+}
+
+.bg-buteurs  {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+}
+
+.bg-buteurs::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: url('/buteurs.jpg'); 
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: brightness(0.3) contrast(1);  
+}
+
+
+ 

@@ -4,12 +4,13 @@ import { useRef, useEffect } from "react"
 import { gsap } from "gsap"
 import { Lightning, Lock } from "@phosphor-icons/react"
 import { ScoreInput } from "./ScoreInput"
-import type { FakeMatchDetailed } from "@/lib/fake-data/matches"
+import type { ViewMatch } from "@/lib/matches-data"
+
 
 type MatchdayStatus = "past" | "current" | "future"
 
 type MatchCardProps = {
-  match: FakeMatchDetailed
+  match: ViewMatch
   homePrediction: number | null
   awayPrediction: number | null
   isBanco: boolean
@@ -31,32 +32,44 @@ export function MatchCard({
 }: MatchCardProps) {
   const rectRef = useRef<SVGRectElement>(null)
 
-  // ============================================
-  // ANIMATION TRACÉ BANCO
-  // ============================================
+// Track le dernier état appliqué, pour ne pas re-animer "rien → rien"
+  const lastIsBancoRef = useRef<boolean | null>(null)
+
   useEffect(() => {
     const rect = rectRef.current
     if (!rect) return
 
-    const length = rect.getTotalLength()
+    const previous = lastIsBancoRef.current
+    lastIsBancoRef.current = isBanco
 
-    gsap.set(rect, {
-      strokeDasharray: length,
-      strokeDashoffset: length,
+    // Au tout premier mount, on initialise sans animer
+    if (previous === null) {
+      const length = rect.getTotalLength()
+      if (length === 0) return
+      gsap.set(rect, {
+        strokeDasharray: length,
+        strokeDashoffset: isBanco ? 0 : length,
+      })
+      return
+    }
+
+    // Sinon on n'anime que si la valeur a réellement changé
+    if (previous === isBanco) return
+
+    gsap.killTweensOf(rect)
+    const length = rect.getTotalLength()
+    if (length === 0) return
+
+    gsap.set(rect, { strokeDasharray: length })
+
+    gsap.to(rect, {
+      strokeDashoffset: isBanco ? 0 : length,
+      duration: isBanco ? 0.7 : 0.4,
+      ease: isBanco ? "power2.inOut" : "power2.in",
     })
 
-    if (isBanco) {
-      gsap.to(rect, {
-        strokeDashoffset: 0,
-        duration: 0.7,
-        ease: "power2.inOut",
-      })
-    } else {
-      gsap.to(rect, {
-        strokeDashoffset: length,
-        duration: 0.4,
-        ease: "power2.in",
-      })
+    return () => {
+      gsap.killTweensOf(rect)
     }
   }, [isBanco])
 
@@ -64,11 +77,11 @@ export function MatchCard({
   // HANDLERS
   // ============================================
   const handleHomeChange = (value: number) => {
-    onPredictionChange(match.id, value, awayPrediction)
+    onPredictionChange(match.id, value, awayPrediction ?? 0)
   }
 
   const handleAwayChange = (value: number) => {
-    onPredictionChange(match.id, homePrediction, value)
+  onPredictionChange(match.id, homePrediction ?? 0, value)
   }
 
   // ============================================
@@ -95,25 +108,25 @@ export function MatchCard({
   style={{ zIndex: 1, overflow: "visible" }}
   preserveAspectRatio="none"
 >
-  <rect
-    ref={rectRef}
-    x="0"
-    y="0"
-    width="100%"
-    height="100%"
-    rx="16"
-    ry="16"
-    fill="none"
-    stroke="#A8FF00"
-    strokeWidth="2"
-  />
+<rect
+  ref={rectRef}
+  x="0"
+  y="0"
+  width="100%"
+  height="100%"
+  rx="16"
+  ry="16"
+  fill="none"
+  stroke="#A8FF00"
+  strokeWidth="2"
+/>
 </svg>
 
       <div className="relative p-5 md:p-6" style={{ zIndex: 2 }}>
 
         {/* Header : date + indicateur statut + toggle banco / points */}
 <div className="flex items-center justify-between mb-5 h-8">
-  <p className="text-xs uppercase tracking-widest text-text-muted">
+  <p className="text-xs uppercase tracking-widest text-accent/50">
     {match.kickoffDate} · {match.kickoffTime}
   </p>
 
