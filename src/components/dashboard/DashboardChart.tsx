@@ -266,6 +266,8 @@ export function DashboardChart({ data }: DashboardChartProps) {
                 tickLine={false}
                 axisLine={false}
                 reversed={trend.yAxisInverted}
+                allowDecimals={false}
+                domain={[1, 'dataMax']}
               />
               <Tooltip content={<CustomTooltip trend={trend} />} cursor={{ stroke: "rgba(168,255,0,0.2)" }} />
               <Line
