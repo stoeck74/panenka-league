@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { recalculatePoints } from "@/lib/actions/recalculate-points"
 
 import {
   fetchCompetition,
@@ -44,6 +45,7 @@ export async function GET(request: NextRequest) {
 
   const startTime = Date.now()
   const log: string[] = []
+  const forceRecalc = request.nextUrl.searchParams.get("force") === "true"
 
   try {
     // ============================================
@@ -139,6 +141,8 @@ export async function GET(request: NextRequest) {
     let matchdaysUpserted = 0
     let matchesUpserted = 0
     let matchesNewlyFinished = 0
+    // IDs des matchs qui viennent de passer en FINISHED — pour recalcul ciblé
+    const newlyFinishedMatchIds: string[] = []
 
     for (const [matchdayNumber, mdMatches] of matchesByMatchday) {
       const sortedKickoffs = mdMatches
@@ -183,15 +187,15 @@ export async function GET(request: NextRequest) {
 
         // Détecte les matchs qui viennent de passer en FINISHED
         const previousStatus = statusByExternalId.get(apiMatch.id)
-        if (
+        const justFinished =
           previousStatus &&
           previousStatus !== "FINISHED" &&
           newStatus === "FINISHED"
-        ) {
+        if (justFinished) {
           matchesNewlyFinished++
         }
 
-        await prisma.match.upsert({
+        const upserted = await prisma.match.upsert({
           where: { externalId: apiMatch.id },
           create: {
             externalId: apiMatch.id,
@@ -213,6 +217,9 @@ export async function GET(request: NextRequest) {
             awayScore: apiMatch.score.fullTime.away,
           },
         })
+        if (justFinished) {
+          newlyFinishedMatchIds.push(upserted.id)
+        }
         matchesUpserted++
       }
     }
@@ -258,18 +265,34 @@ export async function GET(request: NextRequest) {
       `✓ ${matchdaysUpserted} journées + ${matchesUpserted} matchs synchronisés (${matchesNewlyFinished} nouveaux terminés)`
     )
 
+// ============================================
+    // ÉTAPE 6 — Recalcul des points
     // ============================================
-    // ÉTAPE 4 — Recalcul points si nouveaux matchs FINISHED
-    // ============================================
-    // TODO : brancher quand src/lib/actions/points.ts existera
-    // if (matchesNewlyFinished > 0) {
-    //   const pointsResult = await calculateAllPointsInternal()
-    //   if (pointsResult.ok) {
-    //     log.push(`✓ ${pointsResult.totalUpdated} pronos recalculés`)
-    //   } else {
-    //     log.push(`⚠️ Erreur lors du recalcul des points`)
-    //   }
-    // }
+    // - Par défaut (incrémental) : on recalcule UNIQUEMENT les pronos sur les
+    //   matchs qui viennent de passer en FINISHED dans ce tick de cron.
+    // - Avec ?force=true : recalcul total de tous les pronos FINISHED.
+    //   À utiliser en cas de correction de score tardive par la FFF.
+    if (forceRecalc) {
+      const pointsResult = await recalculatePoints()
+      if (pointsResult.ok) {
+        log.push(
+          `✓ FORCE : ${pointsResult.predictionsUpdated} pronos recalculés sur ${pointsResult.matchesProcessed} matchs`,
+        )
+      } else {
+        log.push(`⚠️ Erreur recalcul forcé : ${pointsResult.error}`)
+      }
+    } else if (newlyFinishedMatchIds.length > 0) {
+      const pointsResult = await recalculatePoints(newlyFinishedMatchIds)
+      if (pointsResult.ok) {
+        log.push(
+          `✓ ${pointsResult.predictionsUpdated} pronos recalculés sur ${pointsResult.matchesProcessed} matchs nouvellement terminés`,
+        )
+      } else {
+        log.push(`⚠️ Erreur recalcul : ${pointsResult.error}`)
+      }
+    } else {
+      log.push(`→ Aucun match nouvellement terminé, recalcul skip`)
+    }
 
     const duration = Date.now() - startTime
     return NextResponse.json({
