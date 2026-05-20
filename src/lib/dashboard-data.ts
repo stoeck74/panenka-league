@@ -1015,11 +1015,14 @@ export async function getWorstTeamForUser(
     }
   }
 
-  for (const p of judged) {
-    const missed = (p.pointsEarned ?? 0) === 0
+ for (const p of judged) {
+    // Un prono est "raté" s'il ne rapporte AUCUN point gagné
+    // (≤ 0 couvre les 0 sans banco ET les -2 avec banco)
+    const missed = (p.pointsEarned ?? 0) <= 0
     addStat(p.match.homeTeam, missed)
     addStat(p.match.awayTeam, missed)
   }
+
 
   // Filtre les équipes qui atteignent le seuil
   const eligible = Array.from(byTeam.values()).filter(

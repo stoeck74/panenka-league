@@ -362,13 +362,18 @@ export default async function DashboardPage() {
                     </div>
 
                     {/* 4. POINTS */}
-                    <div
+                     <div
                       className={`
-                        text-xs font-bold w-12 text-right shrink-0 tabular-nums
-                        ${result.myPoints > 0 ? "text-accent" : "text-text-muted"}
+                        font-bold w-12 text-right shrink-0 tabular-nums
+                        ${result.myPoints > 0
+                          ? "text-accent"
+                          : result.myPoints < 0
+                            ? "text-red-400"
+                            : "text-text-muted"
+                        }
                       `}
                     >
-                      {result.myPoints > 0 ? `+${result.myPoints}` : "0"}
+                      {result.myPoints > 0 ? `+${result.myPoints}` : result.myPoints}
                     </div>
                   </div>
                 ))
@@ -465,7 +470,10 @@ export default async function DashboardPage() {
             </div>
           </div>          
 
-
+          <div className="lg:col-span-3 rounded-2xl bg-black/ border border-white/10 backdrop-blur-xl p-6 md:p-8 h-full overflow-hidden">
+           <div className="absolute top-2/3 h-full w-full bg-linear-to-t from-accent to-transparent rounded-full blur-3xl pointer-events-none isolate" />
+            <RankingTrendCard trend={rankingTrend} />
+          </div>
 
           <div className="lg:col-span-3 rounded-2xl bg-black/15 border border-white/10 backdrop-blur-xl p-6 md:p-8 relative overflow-hidden">
             <div className="absolute top-2/3 h-full w-full bg-linear-to-t from-accent to-transparent rounded-full blur-3xl pointer-events-none isolate" />
@@ -474,15 +482,12 @@ export default async function DashboardPage() {
               </div>
               
           <div className="lg:col-span-3 rounded-2xl bg-black/ border border-white/10 backdrop-blur-xl p-6 md:p-8 h-full overflow-hidden">
-           <div className="absolute top-2/3 h-full w-full bg-linear-to-t from-accent to-transparent rounded-full blur-3xl pointer-events-none isolate" />
+           <div className="absolute top-2/3 h-full w-full bg-linear-to-t from-red-500 to-red-200/5 rounded-full blur-3xl pointer-events-none isolate" />
             <WorstTeamCard worstTeam={worstTeam} />
           </div>
 
    
-          <div className="lg:col-span-3 rounded-2xl bg-black/ border border-white/10 backdrop-blur-xl p-6 md:p-8 h-full overflow-hidden">
-           <div className="absolute top-2/3 h-full w-full bg-linear-to-t from-accent to-transparent rounded-full blur-3xl pointer-events-none isolate" />
-            <RankingTrendCard trend={rankingTrend} />
-          </div>
+
        </div>
 
       </div>

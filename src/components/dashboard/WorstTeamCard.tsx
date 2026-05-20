@@ -74,7 +74,7 @@ export function WorstTeamCard({ worstTeam }: WorstTeamCardProps) {
             </p>
           </div>
           <h3 className="text-xl font-bold text-text-primary">
-            <span className="text-accent">Ton</span> cauchemar
+            <span className="text-red-600">Ton</span> cauchemar
           </h3>
         </div>
         <div className="flex-1 flex items-center justify-center py-4">
@@ -91,13 +91,13 @@ export function WorstTeamCard({ worstTeam }: WorstTeamCardProps) {
       {/* Header */}
       <div className="mb-4">
         <div className="flex items-center gap-2 mb-1">
-          <Skull size={36} weight="light" className="text-accent" />
+          <Skull size={36} weight="light" className="text-red-600" />
           <p className="text-xs uppercase tracking-widest text-text-muted">
             Bête noire
           </p>
         </div>
         <h3 className="text-xl font-bold text-text-primary">
-          Bête noire : <span className="text-accent uppercase">{worstTeam.shortName}</span>
+          Bête noire : <span className="text-red-500 uppercase">{worstTeam.shortName}</span>
         </h3>
       </div>
 
@@ -114,7 +114,7 @@ export function WorstTeamCard({ worstTeam }: WorstTeamCardProps) {
               <img
                 src={worstTeam.crestUrl}
                 alt={worstTeam.shortName}
-                className="w-full h-full object-contain grayscale opacity-80"
+                className="w-full h-full object-contain"
               />
             ) : (
               <Skull size={64} weight="fill" className="text-red-400/40" />

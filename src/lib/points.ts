@@ -2,10 +2,9 @@
 // BARÈME PANENKA
 // ============================================
 // Calcul des points pour un prono Panenka selon le barème classique :
-//   - Score exact       : 3 pts
-//   - Bon résultat seul : 1 pt
-//   - Mauvais résultat  : 0 pt
-//   - Banco             : ×2 sur les points gagnés (0 reste 0)
+//   - Score exact       : 3 pts (×2 si banco = 6 pts)
+//   - Bon résultat seul : 1 pt  (×2 si banco = 2 pts)
+//   - Mauvais résultat  : 0 pt  (-2 pts si banco — pénalité)
 //
 // Cette fonction est pure : pas d'accès DB, pas d'effet de bord.
 // Elle est utilisée à la sync (quand un match passe à FINISHED) et
@@ -14,6 +13,7 @@
 export const POINTS_EXACT = 3
 export const POINTS_GOOD_RESULT = 1
 export const POINTS_WRONG = 0
+export const POINTS_BANCO_FAIL_PENALTY = -2
 
 export type PointsBreakdown = {
   points: number
@@ -60,9 +60,9 @@ export function calculatePoints(
     }
   }
 
-  // 3. Faux
+ // 3. Faux — banco activé : pénalité (-2), sinon 0
   return {
-    points: POINTS_WRONG,
+    points: prediction.isBanco ? POINTS_BANCO_FAIL_PENALTY : POINTS_WRONG,
     reason: "wrong",
     bancoMultiplier: multiplier,
   }

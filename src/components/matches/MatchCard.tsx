@@ -98,29 +98,41 @@ export function MatchCard({
 
   const bancoDisabled = bancoLimitReached && !isBanco
   const isFinished = match.status === "finished"
+ // Halo de feedback sur matchs finis avec prono
+  const hasPrediction = homePrediction !== null && awayPrediction !== null
+  const showSuccessHalo = isFinished && hasPrediction && (match.myPoints ?? 0) > 0
+  const showFailHalo = isFinished && hasPrediction && (match.myPoints ?? 0) === 0
 
   return (
-    <div className="relative rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-xl overflow-hidden">
+      <div className="relative rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-xl overflow-hidden">
 
-      {/* SVG animation tracé banco */}
-<svg
-  className="absolute inset-0 w-full h-full pointer-events-none"
-  style={{ zIndex: 1, overflow: "visible" }}
-  preserveAspectRatio="none"
->
-<rect
-  ref={rectRef}
-  x="0"
-  y="0"
-  width="100%"
-  height="100%"
-  rx="16"
-  ry="16"
-  fill="none"
-  stroke="#A8FF00"
-  strokeWidth="2"
-/>
-</svg>
+        {/* Halo de feedback */}
+        {showSuccessHalo && (
+          <div className="absolute top-0 h-full w-full bg-linear-to-t from-accent/50 to-transparent rounded-full blur-[96px] pointer-events-none isolate" />
+        )}
+        {showFailHalo && (
+          <div className="absolute top-0 h-full w-full bg-linear-to-t from-red-600/50 to-transparent rounded-full blur-[96px] pointer-events-none isolate" />
+        )}
+
+        {/* SVG animation tracé banco */}
+  <svg
+    className="absolute inset-0 w-full h-full pointer-events-none"
+    style={{ zIndex: 1, overflow: "visible" }}
+    preserveAspectRatio="none"
+  >
+  <rect
+    ref={rectRef}
+    x="0"
+    y="0"
+    width="100%"
+    height="100%"
+    rx="16"
+    ry="16"
+    fill="none"
+    stroke="#A8FF00"
+    strokeWidth="2"
+  />
+  </svg>
 
       <div className="relative p-5 md:p-6" style={{ zIndex: 2 }}>
 
@@ -172,6 +184,21 @@ export function MatchCard({
             </div>
           )}
         </div>
+
+        {/* Équipe domicile */}
+        {/* Labels SCORE / PRONO — uniquement sur matchs finis avec un prono */}
+        {isFinished && match.homeScore !== undefined && (
+          <div className="flex items-center justify-end py-1 border-b border-white/5">
+            <div className="shrink-0 flex items-center gap-6 mr-8">
+              <span className="text-[10px] uppercase tracking-widest text-text-primary w-12 text-center">
+                Score réel
+              </span>
+              <span className="text-[10px] uppercase tracking-widest text-accent w-12 text-center">
+                Prono engagé
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Équipe domicile */}
         <div className="flex items-center justify-between py-3 border-b border-white/5">
@@ -229,22 +256,33 @@ export function MatchCard({
           </div>
         </div>
 
-        {/* Footer points gagnés — pour matchs terminés */}
-        {isFinished && match.myPoints !== undefined && (
-          <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+{/* Footer points gagnés — pour matchs terminés */}
+        {isFinished && (
+          <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between mr-8">
             <p className="text-xs uppercase tracking-widest text-text-muted">
               {homePrediction !== null && awayPrediction !== null
                 ? "Mon prono"
                 : "Pas de prono"}
             </p>
-            <p
-              className={`
-                text-sm font-bold
-                ${match.myPoints > 0 ? "text-accent" : "text-text-muted"}
-              `}
-            >
-              {match.myPoints > 0 ? `+${match.myPoints}` : "0"} pts
-            </p>
+            {match.myPoints !== undefined ? (
+              <p
+                className={`
+                  text-sm font-bold
+                  ${match.myPoints > 0
+                    ? "text-accent"
+                    : match.myPoints < 0
+                      ? "text-red-400"
+                      : "text-text-muted"
+                  }
+                `}
+              >
+                {match.myPoints > 0 ? `+${match.myPoints}` : match.myPoints} pts
+              </p>
+            ) : (
+              <p className="text-sm text-text-muted italic">
+                —
+              </p>
+            )}
           </div>
         )}
 

@@ -83,7 +83,7 @@ export function PointsLastStageCard({ points, matchdayNumber }: PointsLastStageC
                   DIGITS_FOR_SHOW.split("").map((d) => (
                     <span
                       key={`${cycleIdx}-${d}`}
-                      className="font-black tabular-nums flex items-center justify-center"
+                      className="font-black tabular-nums flex items-center justify-center px-1"
                       style={{
                         height: `${DIGIT_HEIGHT}px`,
                         fontSize: `${DIGIT_HEIGHT * 0.9}px`,

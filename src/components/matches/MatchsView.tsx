@@ -45,21 +45,32 @@ export function MatchsView({
     Map<string, { home: number | null; away: number | null }>
   >(new Map())
 
-  // Re-sync depuis les props quand la journée change (ou que matches change après revalidate)
+ // Hydrate les pronos depuis les props pour les matchs qu'on ne connaît PAS encore.
+  // Si on a déjà saisi un prono pendant la session, on garde notre state local.
   useEffect(() => {
-    const newBancoIds = new Set<string>()
-    const newPredictions = new Map<string, { home: number | null; away: number | null }>()
-
-    displayedMatches.forEach((m) => {
-      if (m.isBanco) newBancoIds.add(m.id)
-      newPredictions.set(m.id, {
-        home: m.myHomePrediction ?? null,
-        away: m.myAwayPrediction ?? null,
+    setBancoIds((prevBancoIds) => {
+      const next = new Set(prevBancoIds)
+      displayedMatches.forEach((m) => {
+        // Initialise depuis les props seulement si le match n'est pas déjà connu localement
+        if (!prevBancoIds.has(m.id) && m.isBanco) {
+          next.add(m.id)
+        }
       })
+      return next
     })
 
-    setBancoIds(newBancoIds)
-    setPredictions(newPredictions)
+    setPredictions((prevPredictions) => {
+      const next = new Map(prevPredictions)
+      displayedMatches.forEach((m) => {
+        if (!prevPredictions.has(m.id)) {
+          next.set(m.id, {
+            home: m.myHomePrediction ?? null,
+            away: m.myAwayPrediction ?? null,
+          })
+        }
+      })
+      return next
+    })
   }, [displayedMatches])
 
   // Refs animations GSAP
@@ -70,23 +81,38 @@ export function MatchsView({
   // ============================================
   // STATS
   // ============================================
+ // Bancos pour la journée affichée uniquement (le state local agrège toutes les journées)
+  const bancosOnSelectedMatchday = useMemo(() => {
+    const displayedIds = new Set(displayedMatches.map((m) => m.id))
+    let count = 0
+    bancoIds.forEach((id) => {
+      if (displayedIds.has(id)) count++
+    })
+    return count
+  }, [bancoIds, displayedMatches])
+
   const stats = useMemo(() => {
     const total = displayedMatches.length
     let predictionsMade = 0
-    predictions.forEach((p) => {
-      if (p.home !== null && p.away !== null) predictionsMade++
+    displayedMatches.forEach((m) => {
+      const p = predictions.get(m.id)
+      if (p && p.home !== null && p.away !== null) predictionsMade++
     })
     return {
       total,
       predictionsMade,
-      bancosUsed: bancoIds.size,
+      bancosUsed: bancosOnSelectedMatchday,
       maxBancos: MAX_BANCOS,
     }
-  }, [predictions, bancoIds, displayedMatches])
+  }, [predictions, bancosOnSelectedMatchday, displayedMatches])
 
+// ============================================
+  // HANDLER PRONO : optimistic update + debounced save + rollback si erreur
   // ============================================
-  // HANDLER PRONO : optimistic update + server action + rollback si erreur
-  // ============================================
+  // Map matchId → timeout ID pour pouvoir annuler le save précédent quand
+  // l'utilisateur continue de taper.
+  const saveTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
+
   const handlePredictionChange = (
     matchId: string,
     home: number | null,
@@ -100,24 +126,32 @@ export function MatchsView({
       return next
     })
 
-    // On ne persist que si les deux côtés sont définis
-    // (cas impossible avec l'auto-fill ?? 0 dans MatchCard, mais ceinture+bretelles)
+    // Pas de save si l'un des côtés est null
     if (home === null || away === null) return
 
-    startTransition(async () => {
-      const result = await savePrediction(matchId, home, away)
-      if (!result.ok) {
-        // Rollback du state local
-        setPredictions((prev) => {
-          const next = new Map(prev)
-          next.set(matchId, previous)
-          return next
-        })
-        toast.error(result.error ?? "Impossible de sauvegarder")
-      } else {
-        toast.success("Prono enregistré")
-      }
-    })
+    // Annule un éventuel save précédent en attente pour ce match
+    const previousTimer = saveTimersRef.current.get(matchId)
+    if (previousTimer) clearTimeout(previousTimer)
+
+    // Programme un nouveau save dans 500ms (= si l'utilisateur arrête de taper)
+    const timer = setTimeout(() => {
+      saveTimersRef.current.delete(matchId)
+      startTransition(async () => {
+        const result = await savePrediction(matchId, home, away)
+        if (!result.ok) {
+          setPredictions((prev) => {
+            const next = new Map(prev)
+            next.set(matchId, previous)
+            return next
+          })
+          toast.error(result.error ?? "Impossible de sauvegarder")
+        } else {
+          toast.success("Prono enregistré")
+        }
+      })
+    }, 500)
+
+    saveTimersRef.current.set(matchId, timer)
   }
 
   // ============================================
@@ -284,7 +318,7 @@ export function MatchsView({
                   homePrediction={prediction.home}
                   awayPrediction={prediction.away}
                   isBanco={bancoIds.has(match.id)}
-                  bancoLimitReached={bancoIds.size >= MAX_BANCOS && !bancoIds.has(match.id)}
+                  bancoLimitReached={bancosOnSelectedMatchday >= MAX_BANCOS && !bancoIds.has(match.id)}
                   matchdayStatus={matchdayStatus}
                   onPredictionChange={handlePredictionChange}
                   onBancoToggle={handleBancoToggle}
