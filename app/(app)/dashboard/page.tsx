@@ -7,7 +7,7 @@ import { PositionPop } from "@/components/dashboard/PositionPop"
 import { HeroProgressBar } from "@/components/dashboard/HeroProgressBar"
 import { SuccessRateCard } from "@/components/dashboard/SuccessRateCard"
 import { ExactScoresCard } from "@/components/dashboard/ExactScoresCard"
-import { GoldenBootCardStub } from "@/components/dashboard/GoldenBootCardStub"
+
 import { PointsLastStageCard } from "@/components/dashboard/PointsLastStageCard"
 
 import { getTopTeamForUser } from "@/lib/dashboard-data"
@@ -18,6 +18,10 @@ import { WorstTeamCard } from "@/components/dashboard/WorstTeamCard"
 
 import { getRankingTrend } from "@/lib/dashboard-data"
 import { RankingTrendCard } from "@/components/dashboard/RankingTrendCard"
+
+import { GoldenBootCard } from "@/components/dashboard/GoldenBootCard"
+import { getGoldenBootInitialData } from "@/lib/dashboard-data"
+
 
 import {
   getCurrentStage,
@@ -49,6 +53,7 @@ export default async function DashboardPage() {
     topTeam,
     worstTeam,
     rankingTrend,
+    goldenBootData,
   ] = await Promise.all([
     getCurrentStage(userId),
     getUserStats(userId),
@@ -61,6 +66,9 @@ export default async function DashboardPage() {
     getTopTeamForUser(userId),
     getWorstTeamForUser(userId),
     getRankingTrend(userId),
+    getGoldenBootInitialData(userId),   // ← ajoute
+
+
 
   ])
 
@@ -180,13 +188,19 @@ export default async function DashboardPage() {
             LIGNE 2 — Stats (Donut + Exacts) + Chart
             ============================================ */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4 relative items-stretch">
-
+          <div className="lg:col-span-2 rounded-2xl bg-black/15 border border-white/10 backdrop-blur-xl p-6 md:p-8 h-full">
+          <PointsLastStageCard
+            points={pointsLastStage}
+            matchdayNumber={lastResultsData.matchdayNumber}
+          />
+        </div>
           <div className="lg:col-span-2 h-full">
             <SuccessRateCard
               goodResults={stats.goodResults + stats.exactScores}
               totalFinished={stats.finishedPredictions}
             />
           </div>
+
 
           <div className="lg:col-span-2 h-full">
             <ExactScoresCard
@@ -195,7 +209,7 @@ export default async function DashboardPage() {
             />
           </div>
 
-          <div className="lg:col-span-8 min-w-0 h-full">
+          <div className="lg:col-span-6 min-w-0 h-full">
             <DashboardChart data={chartData} />
           </div>
 
@@ -203,196 +217,9 @@ export default async function DashboardPage() {
 
 
           {/* ============================================
-            LIGNE 3 — Matchs à pronostiquer + Top + Derniers résultats
+            LIGNE 3 
             ============================================ */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4 relative">
-            <div className="lg:col-span-4">
-              <GoldenBootCardStub />
-            </div>
-        
-
-          {/* MATCHS À PRONOSTIQUER */}
-          <div className="lg:col-span-3 rounded-2xl bg-black/15 border border-white/10 backdrop-blur-xl p-6 md:p-8 overflow-hidden">
-                      <div className="absolute -top-1/2 left-1/2 h-full w-full bg-linear-to-br from-accent/20 to-transparent rounded-full blur-3xl pointer-events-none isolate" />
-          
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                    <p className="text-xs uppercase tracking-widest text-text-muted mb-1">
-                  {lastResultsData.matchdayNumber
-                    ? `Journée ${lastResultsData.matchdayNumber}`
-                    : "Aucun résultat"}
-                </p>
-                <h3 className="text-xl font-bold text-text-primary">
-                  Matchs à pronostiquer
-                </h3>
-              </div>
-              <Link
-                href="/matchs"
-                className="text-sm text-accent hover:underline flex items-center gap-1"
-              >
-                Voir tout
-                <ArrowRight size={14} weight="bold" />
-              </Link>
-            </div>
-
-            <div className="">
-              {currentStage.phase === "ongoing" ? (
-                <p className="text-sm text-text-muted text-center py-4">
-                  Match en cours. Pronos fermés.
-                </p>
-              ) : currentStage.phase === "post" ? (
-                <p className="text-sm text-text-muted text-center py-4">
-                  Saison terminée
-                </p>
-              ) : upcomingMatches.length === 0 ? (
-                <p className="text-sm text-text-muted text-center py-4">
-                  Aucun match à pronostiquer pour l&apos;instant
-                </p>
-              ) : (
-                upcomingMatches.map((match) => {
-                  const hasPrediction =
-                    match.myHomePrediction !== null &&
-                    match.myAwayPrediction !== null
-                  return (
-                    <div
-                      key={match.id}
-                      className="flex items-center gap-3 py-2.5 border-b border-white/5 last:border-b-0 space-x-3"
-                    >
-                     <div className="text-xs text-text-muted shrink-0 hidden sm:block text-left">
-                        <p>{match.kickoffDate}</p>
-                        <p className="text-text-secondary font-medium">
-                          {match.kickoffTime}
-                        </p>
-                      </div>
-                      <div className="flex-1 items-center gap-3  min-w-0">
-                        <span className="text-xs font-bold uppercase text-text-primary shrink-0 w-10">
-                          {match.homeTeamName}
-                        </span>
-                        <span className="text-xs text-text-muted mx-4">vs</span>
-                        <span className="text-xs font-bold uppercase text-text-primary shrink-0 w-10">
-                          {match.awayTeamName}
-                        </span>
-                      </div>
-
-
-
-                      <div className="text-xs shrink-0 w-20 text-right">
-                        {hasPrediction ? (
-                          <span className="text-accent font-bold tabular-nums">
-                            {match.myHomePrediction}-{match.myAwayPrediction}
-                          </span>
-                        ) : (
-                          <span className="text-text-muted italic">À faire</span>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-
-          </div>
-
-           {/* DERNIERS RÉSULTATS */}
-          <div className="lg:col-span-3 rounded-2xl bg-black/15 border border-white/10 backdrop-blur-xl p-6 md:p-8 relative">
-            <div className="flex items-center justify-between mb-6">
-              <div className=" w-full">
-                <p className="text-xs uppercase tracking-widest text-text-muted mb-1">
-                  {currentStage.label}
-                </p>
-                <h3 className="text-xl font-bold text-text-primary flex items-baseline justify-between gap-2">
-                  <span>
-                    <span className="text-accent">(Tes) </span>Derniers résultats
-                  </span>
-                  <span className="text-xs font-normal uppercase tracking-widest text-accent">
-                    pts
-                  </span>
-                </h3>
-              </div>
-              {pointsLastStage > 0 && (
-                <div className="text-right">
-                  <p className="text-xs text-text-muted">Récent</p>
-                  <p className="text-xl font-bold text-accent">
-                    +{pointsLastStage}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="">
-              {lastResultsData.results.length === 0 ? (
-                <p className="text-sm text-text-muted text-center py-4">
-                  Aucun résultat pour l&apos;instant
-                </p>
-              ) : (
-                lastResultsData.results.map((result) => (
-                  <div
-                    key={result.matchId}
-                      className="flex items-center gap-3 py-4.5 border-b border-white/5 last:border-b-0 space-x-3 min-h-[44px]"                  >
-                    {/* 1. NOM ÉQUIPE DOMICILE */}
-                    <div className="flex-1 flex justify-end items-center pr-3 min-w-0">
-                      <span className="text-xs font-bold uppercase text-neutral-200 truncate whitespace-nowrap">
-                        {result.homeTeamName}
-                      </span>
-                    </div>
-
-                    {/* 2. SCORE ou REPORTÉ */}
-                    <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-text-primary tabular-nums shrink-0 w-16">
-                      {result.isPostponed ? (
-                        <span className="text-text-muted italic uppercase text-[10px] tracking-wider">
-                          Reporté
-                        </span>
-                      ) : (
-                        <>
-                          <span>{result.homeScore}</span>
-                          <span className="text-text-muted">-</span>
-                          <span>{result.awayScore}</span>
-                        </>
-                      )}
-                    </div>
-
-                    {/* 3. NOM ÉQUIPE EXTÉRIEUR */}
-                    <div className="flex-1 flex justify-start items-center pl-3 gap-1 min-w-0">
-                      <span className="text-xs font-bold uppercase text-neutral-200 truncate whitespace-nowrap">
-                        {result.awayTeamName}
-                      </span>
-                      {result.isBanco && (
-                        <Lightning size={12} weight="fill" className="text-accent shrink-0" />
-                      )}
-                    </div>
-
-                    {/* 4. POINTS */}
-                     <div
-                      className={`
-                        font-bold w-12 text-right shrink-0 tabular-nums
-                        ${result.myPoints > 0
-                          ? "text-accent"
-                          : result.myPoints < 0
-                            ? "text-red-400"
-                            : "text-text-muted"
-                        }
-                      `}
-                    >
-                      {result.myPoints > 0 ? `+${result.myPoints}` : result.myPoints}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-          <div className="lg:col-span-2 rounded-2xl bg-black/15 border border-white/10 backdrop-blur-xl p-6 md:p-8 h-full">
-          <PointsLastStageCard
-            points={pointsLastStage}
-            matchdayNumber={lastResultsData.matchdayNumber}
-          />
-        </div>
-
-      </div>
-         {/* ============================================
-            LIGNE 4 
-            ============================================ */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4 relative">  
-
+   <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4 relative items-stretch">
         {/* TOP CLASSEMENT */}
           <div className="lg:col-span-3 rounded-2xl bg-black/15 border border-white/10 backdrop-blur-sm p-6 md:p-8 overflow-hidden">
                   <div className="absolute top-0 left-0 h-1/4 w-1/2 bg-linear-to-br from-accent/75 to-lime-500/10  blur-3xl pointer-events-none isolate" />
@@ -468,20 +295,211 @@ export default async function DashboardPage() {
                 })
               )}
             </div>
-          </div>          
+          </div>    
+   
 
+          {/* MATCHS À PRONOSTIQUER */}
+          
+          <div className="lg:col-span-3 rounded-2xl bg-black/15 border border-white/10 backdrop-blur-xl p-6 md:p-8 overflow-hidden">
+                        <div className="absolute top-0 -right-1/4 h-1/4 w-1/2 bg-linear-to-br from-accent/75 to-lime-500/10  blur-3xl pointer-events-none isolate" />
+
+          
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                   <p className="text-xs uppercase tracking-widest text-text-muted mb-1">
+                  {currentStage.number
+                    ? `Journée ${currentStage.number}`
+                    : "À venir"}
+                </p>
+                <h3 className="text-xl font-bold text-text-primary">
+                  Matchs à pronostiquer
+                </h3>
+              </div>
+              <Link
+                href="/matchs"
+                className="text-sm text-accent hover:underline flex items-center gap-1"
+              >
+                Voir tout
+                <ArrowRight size={14} weight="bold" />
+              </Link>
+            </div>
+
+            <div className="">
+              {currentStage.phase === "ongoing" ? (
+                <p className="text-sm text-text-muted text-center py-4">
+                  Match en cours. Pronos fermés.
+                </p>
+              ) : currentStage.phase === "post" ? (
+                <p className="text-sm text-text-muted text-center py-4">
+                  Saison terminée
+                </p>
+              ) : upcomingMatches.length === 0 ? (
+                <p className="text-sm text-text-muted text-center py-4">
+                  Aucun match à pronostiquer pour l&apos;instant
+                </p>
+              ) : (
+                upcomingMatches.map((match) => {
+                  const hasPrediction =
+                    match.myHomePrediction !== null &&
+                    match.myAwayPrediction !== null
+                  return (
+                    <div
+                      key={match.id}
+                       className="flex items-center gap-3 py-2.5 border-b border-white/5 last:border-b-0 space-x-3 min-h-[55px]"
+                    >
+                     <div className="text-xs text-text-muted shrink-0 hidden sm:block text-left">
+                        <p>{match.kickoffDate}</p>
+                        <p className="text-text-secondary font-medium">
+                          {match.kickoffTime}
+                        </p>
+                      </div>
+                      <div className="flex-1 items-center gap-3  min-w-0">
+                        <span className="text-xs font-bold uppercase text-text-primary shrink-0 w-10">
+                          {match.homeTeamName}
+                        </span>
+                        <span className="text-xs text-text-muted mx-4">vs</span>
+                        <span className="text-xs font-bold uppercase text-text-primary shrink-0 w-10">
+                          {match.awayTeamName}
+                        </span>
+                      </div>
+
+
+
+                      <div className="text-xs shrink-0 w-20 text-right">
+                        {hasPrediction ? (
+                          <span className="text-accent font-bold tabular-nums">
+                            {match.myHomePrediction}-{match.myAwayPrediction}
+                          </span>
+                        ) : (
+                          <span className="text-text-muted italic">À faire</span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+
+          </div>
+              
+           {/* DERNIERS RÉSULTATS */}
+          <div className="lg:col-span-3 rounded-2xl bg-black/15 border border-white/10 backdrop-blur-xl p-6 md:p-8 relative overflow-hidden">
+                        <div className="absolute top-0 -left-1/4 h-1/6 w-2/3 bg-linear-to-br from-accent/75 to-lime-500/25  blur-3xl pointer-events-none isolate" />
+
+            <div className="flex items-center justify-between mb-6">
+              <div className=" w-full">
+                <p className="text-xs uppercase tracking-widest text-text-muted mb-1">
+                    {lastResultsData.matchdayNumber
+                    ? `Journée ${lastResultsData.matchdayNumber}`
+                    : "Pas encore de résultats"}
+                </p>
+                <h3 className="text-xl font-bold text-text-primary flex items-baseline justify-between gap-2">
+                  <span>
+                    <span className="text-accent">(Tes) </span>Derniers résultats
+                  </span>
+                  <span className="text-xs font-normal uppercase tracking-widest text-accent">
+                    pts
+                  </span>
+                </h3>
+              </div>
+              {pointsLastStage > 0 && (
+                <div className="text-right">
+                  <p className="text-xs text-text-muted">Récent</p>
+                  <p className="text-xl font-bold text-accent">
+                    +{pointsLastStage}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="">
+              {lastResultsData.results.length === 0 ? (
+                <p className="text-sm text-text-muted text-center py-4">
+                  Aucun résultat pour l&apos;instant
+                </p>
+              ) : (
+                lastResultsData.results.map((result) => (
+                  <div
+                    key={result.matchId}
+                    className="flex items-center gap-3 border-b border-white/5 last:border-b-0 space-x-3 min-h-[55px]">                   
+                     {/* 1. NOM ÉQUIPE DOMICILE */}
+                    <div className="flex-1 flex justify-end items-center pr-3 min-w-0">
+                      <span className="text-xs font-bold uppercase text-neutral-200 truncate whitespace-nowrap">
+                        {result.homeTeamName}
+                      </span>
+                    </div>
+
+                    {/* 2. SCORE ou REPORTÉ */}
+                    <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-text-primary tabular-nums shrink-0 w-16">
+                      {result.isPostponed ? (
+                        <span className="text-text-muted italic uppercase text-[10px] tracking-wider">
+                          Reporté
+                        </span>
+                      ) : (
+                        <>
+                          <span>{result.homeScore}</span>
+                          <span className="text-text-muted">-</span>
+                          <span>{result.awayScore}</span>
+                        </>
+                      )}
+                    </div>
+
+                    {/* 3. NOM ÉQUIPE EXTÉRIEUR */}
+                    <div className="flex-1 flex justify-start items-center pl-3 gap-1 min-w-0">
+                      <span className="text-xs font-bold uppercase text-neutral-200 truncate whitespace-nowrap">
+                        {result.awayTeamName}
+                      </span>
+                      {result.isBanco && (
+                        <Lightning size={12} weight="fill" className="text-accent shrink-0" />
+                      )}
+                    </div>
+
+                    {/* 4. POINTS */}
+                     <div
+                      className={`
+                        font-bold w-12 text-right shrink-0 tabular-nums
+                        ${result.myPoints > 0
+                          ? "text-accent"
+                          : result.myPoints < 0
+                            ? "text-red-400"
+                            : "text-text-muted"
+                        }
+                      `}
+                    >
+                      {result.myPoints > 0 ? `+${result.myPoints}` : result.myPoints}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
           <div className="lg:col-span-3 rounded-2xl bg-black/ border border-white/10 backdrop-blur-xl p-6 md:p-8 h-full overflow-hidden">
            <div className="absolute top-2/3 h-full w-full bg-linear-to-t from-accent to-transparent rounded-full blur-3xl pointer-events-none isolate" />
             <RankingTrendCard trend={rankingTrend} />
           </div>
+      </div>        
+      </div>
+         {/* ============================================
+            LIGNE 4 
+            ============================================ */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4 relative">  
 
-          <div className="lg:col-span-3 rounded-2xl bg-black/15 border border-white/10 backdrop-blur-xl p-6 md:p-8 relative overflow-hidden">
+           <div className="lg:col-span-3 rounded-2xl bg-black/15 border border-white/10 backdrop-blur-xl p-6 md:p-8">
+            <GoldenBootCard
+              initialPicks={goldenBootData.picks}
+              isLocked={goldenBootData.isLocked}
+            />
+          </div>  
+
+
+
+          <div className="lg:col-span-5 rounded-2xl bg-black/15 border border-white/10 backdrop-blur-xl p-6 md:p-8 relative overflow-hidden">
             <div className="absolute top-2/3 h-full w-full bg-linear-to-t from-accent to-transparent rounded-full blur-3xl pointer-events-none isolate" />
               <TopTeamCard topTeam={topTeam} />
 
               </div>
               
-          <div className="lg:col-span-3 rounded-2xl bg-black/ border border-white/10 backdrop-blur-xl p-6 md:p-8 h-full overflow-hidden">
+          <div className="lg:col-span-4 rounded-2xl bg-black/ border border-white/10 backdrop-blur-xl p-6 md:p-8 h-full overflow-hidden">
            <div className="absolute top-2/3 h-full w-full bg-linear-to-t from-red-500 to-red-200/5 rounded-full blur-3xl pointer-events-none isolate" />
             <WorstTeamCard worstTeam={worstTeam} />
           </div>
@@ -491,7 +509,7 @@ export default async function DashboardPage() {
        </div>
 
       </div>
-    </div>
+
 
 
   )

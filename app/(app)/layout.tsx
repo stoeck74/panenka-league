@@ -20,10 +20,7 @@ export default async function AppLayout({
     where: { id: session.user.id },
     select: { avatarStyle: true, avatarSeed: true },
   })
-console.log("[AppLayout] user data:", {
-  avatarStyle: user?.avatarStyle,
-  avatarSeed: user?.avatarSeed,
-})
+
   return (
     <div className="min-h-screen flex">
       {/* Sidebar : visible uniquement sur desktop (md+) */}

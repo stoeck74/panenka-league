@@ -15,21 +15,23 @@ import {
 // ============================================
 // SYNC API → DB
 // Endpoint appelé par un cron externe (cron-job.org)
-// Sécurisé par un token dans le header "Authorization: Bearer XXX"
-// ou en query param "?token=XXX"
+// Sécurisé par un token en query param "?token=XXX"
+//
+// Modes :
+//   - Normal (async) : réponse immédiate, sync en background
+//   - ?wait=true     : attend la fin et retourne le log complet
+//   - ?force=true    : recalcul forcé de tous les points
 // ============================================
 
 export async function GET(request: NextRequest) {
-  // Vérif token
   const expectedToken = process.env.CRON_SECRET
   if (!expectedToken) {
     return NextResponse.json(
       { ok: false, error: "CRON_SECRET not configured" },
-      { status: 500 }
+      { status: 500 },
     )
   }
 
-  // Token via header Authorization (recommandé) OU query param (fallback)
   const authHeader = request.headers.get("authorization")
   const tokenFromHeader = authHeader?.startsWith("Bearer ")
     ? authHeader.slice(7)
@@ -38,22 +40,15 @@ export async function GET(request: NextRequest) {
   const providedToken = tokenFromHeader || tokenFromQuery
 
   if (providedToken !== expectedToken) {
-    return NextResponse.json(
-      { ok: false, error: "Unauthorized" },
-      { status: 401 }
-    )
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 })
   }
 
-const startTime = Date.now()
+  const startTime = Date.now()
   const log: string[] = []
   const forceRecalc = request.nextUrl.searchParams.get("force") === "true"
-  // Mode synchrone si ?wait=true OU ?force=true (le force a besoin de feedback)
   const waitForCompletion =
     forceRecalc || request.nextUrl.searchParams.get("wait") === "true"
 
-// ============================================
-  // FONCTION DE SYNC — extraite pour pouvoir l'appeler en sync ou async
-  // ============================================
   const runSync = async () => {
     try {
       // ============================================
@@ -89,7 +84,7 @@ const startTime = Date.now()
       log.push(`✓ Season: ${season.name}`)
 
       // ============================================
-      // ÉTAPE 2 — Équipes
+      // ÉTAPE 2 — Équipes (batch transaction)
       // ============================================
       const apiTeams = await fetchTeams()
 
@@ -129,7 +124,7 @@ const startTime = Date.now()
       log.push(`✓ ${upsertedTeams.length} équipes synchronisées`)
 
       // ============================================
-      // ÉTAPE 3 — Matchs + Matchdays
+      // ÉTAPE 3 — Matchs + Matchdays (batch transaction)
       // ============================================
       const apiMatches = await fetchMatches()
       const allTeams = await prisma.team.findMany()
@@ -154,6 +149,7 @@ const startTime = Date.now()
       let matchesNewlyFinished = 0
       const newlyFinishedMatchIds: string[] = []
 
+      // PHASE 1 : batch upsert Matchdays
       const matchdayUpsertOps = Array.from(matchesByMatchday.entries()).map(
         ([matchdayNumber, mdMatches]) => {
           const sortedKickoffs = mdMatches
@@ -167,31 +163,19 @@ const startTime = Date.now()
               kickoffAt: new Date(m.utcDate),
             })),
           )
-
           return prisma.matchday.upsert({
-            where: {
-              seasonId_number: { seasonId: season.id, number: matchdayNumber },
-            },
-            create: {
-              seasonId: season.id,
-              number: matchdayNumber,
-              status: mdStatus,
-              startDate,
-              endDate,
-            },
+            where: { seasonId_number: { seasonId: season.id, number: matchdayNumber } },
+            create: { seasonId: season.id, number: matchdayNumber, status: mdStatus, startDate, endDate },
             update: { status: mdStatus, startDate, endDate },
           })
         },
       )
-      const upsertedMatchdays = await prisma.$transaction(matchdayUpsertOps, {
-        timeout: 30000,
-      })
+      const upsertedMatchdays = await prisma.$transaction(matchdayUpsertOps, { timeout: 30000 })
       matchdaysUpserted = upsertedMatchdays.length
 
-      const matchdayIdByNumber = new Map(
-        upsertedMatchdays.map((md) => [md.number, md.id]),
-      )
+      const matchdayIdByNumber = new Map(upsertedMatchdays.map((md) => [md.number, md.id]))
 
+      // PHASE 2 : prépare les ops match
       const matchUpsertOps: Array<{
         apiMatchId: number
         justFinished: boolean
@@ -210,9 +194,7 @@ const startTime = Date.now()
           const newStatus = mapMatchStatus(apiMatch.status)
           const previousStatus = statusByExternalId.get(apiMatch.id)
           const justFinished =
-            !!previousStatus &&
-            previousStatus !== "FINISHED" &&
-            newStatus === "FINISHED"
+            !!previousStatus && previousStatus !== "FINISHED" && newStatus === "FINISHED"
           if (justFinished) matchesNewlyFinished++
 
           matchUpsertOps.push({
@@ -244,11 +226,13 @@ const startTime = Date.now()
         }
       }
 
+      // PHASE 3 : batch upsert matchs
       const upsertedMatches = await prisma.$transaction(
         matchUpsertOps.map((m) => m.op),
         { timeout: 30000 },
       )
 
+      // PHASE 4 : extraire les newly finished
       for (let i = 0; i < upsertedMatches.length; i++) {
         if (matchUpsertOps[i].justFinished) {
           newlyFinishedMatchIds.push(upsertedMatches[i].id)
@@ -261,7 +245,7 @@ const startTime = Date.now()
       )
 
       // ============================================
-      // ÉTAPE 5 — Top buteurs
+      // ÉTAPE 4 — Top buteurs (batch transaction)
       // ============================================
       const apiScorers = await fetchScorers(15)
 
@@ -293,7 +277,7 @@ const startTime = Date.now()
       log.push(`✓ ${scorerOps.length} buteurs synchronisés`)
 
       // ============================================
-      // ÉTAPE 6 — Recalcul des points
+      // ÉTAPE 5 — Recalcul des points
       // ============================================
       if (forceRecalc) {
         const pointsResult = await recalculatePoints()
@@ -320,6 +304,7 @@ const startTime = Date.now()
       const duration = Date.now() - startTime
       console.log(`[sync-matches] OK in ${duration}ms`, log)
       return { ok: true, duration: `${duration}ms`, log }
+
     } catch (error) {
       console.error("[sync-matches] Error:", error, "log so far:", log)
       return {
@@ -334,20 +319,13 @@ const startTime = Date.now()
   // EXÉCUTION : sync ou async ?
   // ============================================
   if (waitForCompletion) {
-    // Mode synchrone : attend la fin et renvoie le log complet
     const result = await runSync()
-    return NextResponse.json(result, {
-      status: result.ok ? 200 : 500,
-    })
+    return NextResponse.json(result, { status: result.ok ? 200 : 500 })
   } else {
-    // Mode asynchrone : réponse immédiate, sync continue en background
-    after(async () => {
-      await runSync()
-    })
+    after(async () => { await runSync() })
     return NextResponse.json({
       ok: true,
       status: "Sync started in background. Check Vercel logs for completion.",
     })
   }
 }
-

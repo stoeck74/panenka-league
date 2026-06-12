@@ -169,7 +169,7 @@ export function DashboardChart({ data }: DashboardChartProps) {
   })()
   if (data.length === 0) {
     return (
-        <div className="rounded-2xl bg-black/15 border border-white/10 backdrop-blur-xl p-6 md:p-8 h-full flex flex-col">
+        <div className="rounded-2xl bg-black/15 border border-white/10 backdrop-blur-xl p-6 md:p-8 h-full flex flex-col min-h-65">
           
         <div className="mb-4">
           <p className="text-xs uppercase tracking-widest text-text-muted mb-2">

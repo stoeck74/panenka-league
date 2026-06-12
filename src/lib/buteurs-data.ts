@@ -12,6 +12,7 @@ export type ButeurEntry = {
   scorerId: string
   name: string
   goals: number
+  photoUrl: string | null
   team: {
     name: string
     shortName: string
@@ -45,11 +46,31 @@ export async function getButeurs(): Promise<ButeurEntry[]> {
     },
   })
 
-  return scorers.map((s) => ({
-    rank: s.rank,
-    scorerId: s.id,
-    name: s.name,
-    goals: s.goals,
-    team: s.team,
-  }))
+// On cherche la photo du joueur via le model Player (match par nom + équipe)
+  const playersWithPhotos = await prisma.player.findMany({
+    where: {
+      teamId: { in: scorers.map((s) => s.teamId) },
+      photoUrl: { not: null },
+    },
+    select: { name: true, teamId: true, photoUrl: true },
+  })
+
+  // Index par "nom normalisé + teamId" pour lookup rapide
+  const photoIndex = new Map<string, string>()
+  for (const p of playersWithPhotos) {
+    const key = `${p.name.toLowerCase().trim()}-${p.teamId}`
+    if (p.photoUrl) photoIndex.set(key, p.photoUrl)
+  }
+
+  return scorers.map((s) => {
+    const key = `${s.name.toLowerCase().trim()}-${s.teamId}`
+    return {
+      rank: s.rank,
+      scorerId: s.id,
+      name: s.name,
+      goals: s.goals,
+      photoUrl: photoIndex.get(key) ?? null,
+      team: s.team,
+    }
+  })
 }

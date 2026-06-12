@@ -102,7 +102,7 @@ className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#0A0
             {/* Le logo dans son conteneur "rempli" */}
             <img
               src="/logo.svg"
-              alt="World Cup League"
+              alt="Panenka League"
               className="w-full h-auto absolute bottom-0 left-0"
               style={{
                 height: "100%",
@@ -117,7 +117,7 @@ className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#0A0
       {/* Texte sous le logo */}
       <div ref={textRef} className="mt-8 text-center">
         <p className="text-2xl md:text-3xl font-extrabold tracking-wider text-text-primary">
-          WORLD CUP
+          PANENKA
         </p>
         <p className="text-base md:text-lg font-medium text-text-secondary -mt-1">
           League

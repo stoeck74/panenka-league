@@ -66,15 +66,15 @@ export function WorstTeamCard({ worstTeam }: WorstTeamCardProps) {
       <div className="h-full flex flex-col">
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-1">
-            <Skull size={36} weight="bold" className="text-black" />
-            <Skull size={36} weight="light" className="text-accent blur-xs  absolute -z-10" />
-            <Skull size={36} weight="light" className="text-accent blur-sm  absolute -z-20" />
+            <Skull size={36} weight="light" className="text-red-200" />
+            <Skull size={36} weight="bold" className="text-red-600 blur-xs  absolute -z-10" />
+            <Skull size={36} weight="light" className="text-red-200 blur-sm  absolute -z-20" />
             <p className="text-xs uppercase tracking-widest text-text-muted">
               Bête noire
             </p>
           </div>
           <h3 className="text-xl font-bold text-text-primary">
-            <span className="text-red-600">Ton</span> cauchemar
+            <span className="text-red-600">Nemesis</span> Team
           </h3>
         </div>
         <div className="flex-1 flex items-center justify-center py-4">
@@ -125,7 +125,7 @@ export function WorstTeamCard({ worstTeam }: WorstTeamCardProps) {
         {/* Colonne droite : nb de ratés centré */}
         <p
           ref={numberRef}
-          className="text-5xl md:text-[6vw] font-black tabular-nums flex-1 text-center"
+          className="text-5xl md:text-[4.5vw] font-black tabular-nums flex-1 text-center"
           style={{
             background: "linear-gradient(135deg, #f87171, #991b1b)",
             WebkitBackgroundClip: "text",

@@ -37,22 +37,34 @@ enum MatchStatus {
 // ============================================
 
 model User {
-  id              String   @id @default(cuid())
-  email           String   @unique
-  username        String   @unique
-  password        String   // sera hashé avec bcrypt
-  name            String?
-  avatar          String?  // URL de l'avatar (upload custom plus tard)
-  avatarSeed      String?  // seed pour DiceBear si pas d'upload
-  avatarStyle     String?  // "toon-head" ou "personas"
-  bio             String?  // courte description optionnelle
-  favoriteTeamId  String?
-  favoritePlayer  String?  // nom du joueur favori (texte libre)
-  role            UserRole @default(USER)
+  id             String   @id @default(cuid())
+  email          String   @unique
+  username       String   @unique
+  password       String
+  name           String?
+  avatar         String?
+  avatarSeed     String?
+  avatarStyle    String?
+  bio            String?
+  favoriteTeamId String?
+  favoritePlayer String?
+  role           UserRole @default(USER)
+  bonusPoints    Int      @default(0)  // ajustement manuel admin (corrections de bug)
   
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+
+  // Golden Boot
+  goldenBootPoints      Int     @default(0)
   
+  goldenBoot1stPlayerId String?
+  goldenBoot2ndPlayerId String?
+  goldenBoot3rdPlayerId String?
+  goldenBoot1stPlayer   Player? @relation("GoldenBoot1st", fields: [goldenBoot1stPlayerId], references: [id])
+  goldenBoot2ndPlayer   Player? @relation("GoldenBoot2nd", fields: [goldenBoot2ndPlayerId], references: [id])
+  goldenBoot3rdPlayer   Player? @relation("GoldenBoot3rd", fields: [goldenBoot3rdPlayerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
   favoriteTeam       Team?            @relation(fields: [favoriteTeamId], references: [id])
   predictions        Prediction[]
@@ -62,17 +74,14 @@ model User {
 }
 
 model InvitationCode {
-  id          String   @id @default(cuid())
-  code        String   @unique // ex: "PANENKA-2026-XXXX"
-  
+  id          String    @id @default(cuid())
+  code        String    @unique
   createdById String
-  createdBy   User     @relation(fields: [createdById], references: [id])
-  
-  usedById    String?  @unique // null = pas encore utilisé
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  usedById    String?   @unique
   usedAt      DateTime?
-  
   expiresAt   DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 }
 
 // ============================================
@@ -80,49 +89,46 @@ model InvitationCode {
 // ============================================
 
 model Season {
-  id          String   @id @default(cuid())
-  name        String   // ex: "Ligue 1 2025/2026"
-  externalId  Int?     @unique // ID Football-Data
-  startDate   DateTime
-  endDate     DateTime
-  isActive    Boolean  @default(false) // une seule saison active à la fois
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  id         String   @id @default(cuid())
+  name       String
+  externalId Int?     @unique
+  startDate  DateTime
+  endDate    DateTime
+  isActive   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
   // Relations
-  matchdays   Matchday[]
-  teams       SeasonTeam[]
-  scorers        Scorer[]
+  matchdays Matchday[]
+  teams     SeasonTeam[]
+  scorers   Scorer[]
 }
 
 model Team {
-  id          String   @id @default(cuid())
-  externalId  Int      @unique // ID Football-Data
-  name        String   // "Olympique de Marseille"
-  shortName   String   // "Marseille"
-  tla         String   // "OM" (Three Letter Abbreviation)
-  crestUrl    String?  // URL du blason
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  id         String   @id @default(cuid())
+  externalId Int      @unique
+  name       String
+  shortName  String
+  tla        String
+  crestUrl   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
   // Relations
-  homeMatches    Match[]   @relation("HomeTeam")
-  awayMatches    Match[]   @relation("AwayTeam")
-  fans           User[]    // les users qui ont cette team en favorite
-  seasons        SeasonTeam[]
-  scorers        Scorer[]
+  homeMatches Match[]    @relation("HomeTeam")
+  awayMatches Match[]    @relation("AwayTeam")
+  fans        User[]
+  seasons     SeasonTeam[]
+  scorers     Scorer[]
+  players     Player[]
 }
 
-// Table de jonction Season <-> Team (un même club joue plusieurs saisons)
 model SeasonTeam {
   seasonId String
   teamId   String
-  
   season   Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
   team     Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  
+
   @@id([seasonId, teamId])
 }
 
@@ -131,46 +137,40 @@ model SeasonTeam {
 // ============================================
 
 model Matchday {
-  id          String         @id @default(cuid())
-  number      Int            // 1 à 34
-  seasonId    String
-  status      MatchdayStatus @default(UPCOMING)
-  
-  startDate   DateTime       // date du premier match prévu
-  endDate     DateTime       // date du dernier match prévu
-  
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  
+  id        String         @id @default(cuid())
+  number    Int
+  seasonId  String
+  status    MatchdayStatus @default(UPCOMING)
+  startDate DateTime
+  endDate   DateTime
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
   // Relations
-  season      Season         @relation(fields: [seasonId], references: [id], onDelete: Cascade)
-  matches     Match[]
-  
+  season  Season  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  matches Match[]
+
   @@unique([seasonId, number])
 }
 
 model Match {
-  id            String       @id @default(cuid())
-  externalId    Int          @unique // ID Football-Data
-  matchdayId    String
-  
-  homeTeamId    String
-  awayTeamId    String
-  
-  kickoffAt     DateTime     // heure du coup d'envoi
-  status        MatchStatus  @default(SCHEDULED)
-  
-  homeScore     Int?         // null tant que pas joué
-  awayScore     Int?
-  
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  
+  id         String      @id @default(cuid())
+  externalId Int         @unique
+  matchdayId String
+  homeTeamId String
+  awayTeamId String
+  kickoffAt  DateTime
+  status     MatchStatus @default(SCHEDULED)
+  homeScore  Int?
+  awayScore  Int?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
   // Relations
-  matchday      Matchday     @relation(fields: [matchdayId], references: [id], onDelete: Cascade)
-  homeTeam      Team         @relation("HomeTeam", fields: [homeTeamId], references: [id])
-  awayTeam      Team         @relation("AwayTeam", fields: [awayTeamId], references: [id])
-  predictions   Prediction[]
+  matchday    Matchday     @relation(fields: [matchdayId], references: [id], onDelete: Cascade)
+  homeTeam    Team         @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam    Team         @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  predictions Prediction[]
 }
 
 // ============================================
@@ -178,24 +178,21 @@ model Match {
 // ============================================
 
 model Prediction {
-  id              String   @id @default(cuid())
-  userId          String
-  matchId         String
-  
-  homeScore       Int      // score domicile prédit
-  awayScore       Int      // score extérieur prédit
-  isBanco         Boolean  @default(false)
-  
-  pointsEarned    Int?     // calculé après que le match soit joué
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
+  id           String   @id @default(cuid())
+  userId       String
+  matchId      String
+  homeScore    Int
+  awayScore    Int
+  isBanco      Boolean  @default(false)
+  pointsEarned Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
   // Relations
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  match           Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  
-  @@unique([userId, matchId]) // un seul prono par user par match
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, matchId])
 }
 
 // ============================================
@@ -203,24 +200,48 @@ model Prediction {
 // ============================================
 
 model Scorer {
+  id         String   @id @default(cuid())
+  externalId Int      @unique
+  name       String
+  seasonId   String
+  teamId     String
+  goals      Int      @default(0)
+  rank       Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  season Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  team   Team   @relation(fields: [teamId], references: [id])
+
+  @@index([seasonId, rank])
+}
+
+// ============================================
+// PLAYER — Joueurs L1 (pour Golden Boot)
+// ============================================
+
+model Player {
   id          String   @id @default(cuid())
-  externalId  Int      @unique  // Football-Data player.id
+  externalId  Int      @unique
   name        String
-  
-  seasonId    String
+  position    String?  // "Offence" | "Midfield" | "Defence" | "Goalkeeper"
+  nationality String?
+  photoUrl    String?  // URL photo depuis api-football
   teamId      String
-  
-  goals       Int      @default(0)
-  rank        Int      // 1 = meilleur buteur, calculé au sync
-  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   // Relations
-  season      Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
-  team        Team     @relation(fields: [teamId], references: [id])
-  
-  @@index([seasonId, rank])
+  team Team @relation(fields: [teamId], references: [id])
+
+  // Relations inverses Golden Boot
+  goldenBoot1stFor User[] @relation("GoldenBoot1st")
+  goldenBoot2ndFor User[] @relation("GoldenBoot2nd")
+  goldenBoot3rdFor User[] @relation("GoldenBoot3rd")
+
+  @@index([teamId])
+  @@index([position])
 }
 
 // ============================================
@@ -239,9 +260,9 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-  
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   @@id([provider, providerAccountId])
 }
 
@@ -249,7 +270,7 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -257,6 +278,6 @@ model VerificationToken {
   identifier String
   token      String
   expires    DateTime
-  
+
   @@id([identifier, token])
 }

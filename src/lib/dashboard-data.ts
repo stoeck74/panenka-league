@@ -1211,3 +1211,56 @@ export async function getRankingTrend(userId: string): Promise<RankingTrend> {
     overtakenUsernames,
   }
 }
+// ============================================
+// GOLDEN BOOT — Picks initiaux + statut lock
+// ============================================
+
+export async function getGoldenBootInitialData(userId: string) {
+  const season = await prisma.season.findFirst({
+    where: { isActive: true },
+    select: { id: true },
+    
+  })
+
+  // Lock : T-1h avant le 1er match de la saison active
+  let isLocked = true
+  if (season) {
+    const firstMatch = await prisma.match.findFirst({
+      where: { matchday: { seasonId: season.id } },
+      orderBy: { kickoffAt: "asc" },
+      select: { kickoffAt: true },
+    })
+    if (firstMatch) {
+isLocked = process.env.NODE_ENV === "production"
+    ? Date.now() >= firstMatch.kickoffAt.getTime() - 60 * 60 * 1000
+    : false    }
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      goldenBoot1stPlayer: {
+        
+        select: { id: true, name: true, position: true, nationality: true,photoUrl: true,
+          team: { select: { name: true, tla: true, crestUrl: true } } },
+      },
+      goldenBoot2ndPlayer: {
+        select: { id: true, name: true, position: true, nationality: true,photoUrl: true,
+          team: { select: { name: true, tla: true, crestUrl: true } } },
+      },
+      goldenBoot3rdPlayer: {
+        select: { id: true, name: true, position: true, nationality: true,photoUrl: true,
+          team: { select: { name: true, tla: true, crestUrl: true } } },
+      },
+    },
+  })
+
+  return {
+    picks: {
+      first: user?.goldenBoot1stPlayer ?? null,
+      second: user?.goldenBoot2ndPlayer ?? null,
+      third: user?.goldenBoot3rdPlayer ?? null,
+    },
+    isLocked,
+  }
+}

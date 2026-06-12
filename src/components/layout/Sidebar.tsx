@@ -80,7 +80,7 @@ export function Sidebar({ username, role, avatarStyle, avatarSeed }: SidebarProp
     <Link href="/dashboard" className="flex items-center gap-3 px-3 w-full">
       <img
         src="/logo.svg"
-        alt="World Cup League"
+        alt="Panenka League"
         className="h-14 w-14 object-contain shrink-0"
       />
       <div className={`flex flex-col leading-tight whitespace-nowrap transition-opacity duration-200 ${expanded ? "opacity-100" : "opacity-0"}`}>

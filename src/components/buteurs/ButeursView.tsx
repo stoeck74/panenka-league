@@ -52,8 +52,13 @@ export function ButeursView({ buteurs }: ButeursViewProps) {
     }
 
     // Liste avec barres animées
+// Liste avec barres animées — démarre après la fin du podium
     const list = listRef.current
     if (list) {
+      // Fade in de la liste entière d'abord
+      gsap.set(list, { opacity: 0 })
+      gsap.to(list, { opacity: 1, duration: 0.4, delay: 1.2, ease: "power2.out" })
+
       const rows = list.querySelectorAll("[data-row]")
       const bars: Element[] = []
       const labels: Element[] = []
@@ -65,27 +70,39 @@ export function ButeursView({ buteurs }: ButeursViewProps) {
         if (bar && label) {
           bars.push(bar)
           labels.push(label)
-          targetWidths.push((row as HTMLElement).dataset.targetWidth ?? "0%")
+          // On plafonne à 92% pour laisser de la place à la photo au bout
+          const raw = parseFloat((row as HTMLElement).dataset.targetWidth ?? "0")
+          targetWidths.push(`${Math.min(raw, 95)}%`)
         }
       })
-
       gsap.set(bars, { width: "0%" })
       gsap.set(labels, { opacity: 0 })
+
+const photoCursors = Array.from(list.querySelectorAll("[data-photo-cursor]"))
 
       bars.forEach((bar, i) => {
         gsap.to(bar, {
           width: targetWidths[i],
-          duration: 0.7,
+          duration: 1,
           ease: "power3.out",
-          delay: 1.4,
+          delay: 1.6 + i * 0.05,
         })
+        // La photo suit la barre
+        if (photoCursors[i]) {
+          gsap.to(photoCursors[i], {
+            left: targetWidths[i],
+            duration:1,
+            ease: "power3.out",
+            delay: 1.6 + i * 0.05,
+          })
+        }
       })
 
       gsap.to(labels, {
         opacity: 1,
         duration: 0.3,
         ease: "power2.out",
-        delay: 2.1,
+        delay: 2.4,
       })
     }
 
@@ -191,10 +208,10 @@ function PodiumCard({
       : "text-base md:text-lg"
 
   const crestSize = isFirst
-    ? "w-20 h-20 md:w-24 md:h-24"
+    ? "w-36 h-36"
     : isSecond
-      ? "w-14 h-14 md:w-16 md:h-16"
-      : "w-10 h-10 md:w-12 md:h-12"
+      ? "w-24 h-24"
+      : "w-24 h-24"
 
   const nameSize = isFirst
     ? "text-lg md:text-2xl"
@@ -239,8 +256,9 @@ function PodiumCard({
         </span>
       </p>
 
-      {/* CREST de l'équipe (plus parlant qu'un avatar joueur) */}
-      <div className={`${crestSize} shrink-0 mb-3 flex items-center justify-center`}>
+{/* Logo équipe grand + badge photo joueur en bas à droite */}
+      <div className={`${crestSize} shrink-0 mb-3 relative flex items-center justify-center`}>
+        {/* Logo équipe — élément principal */}
         {entry.team.crestUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -253,6 +271,20 @@ function PodiumCard({
             size={isFirst ? 64 : 40}
             weight="fill"
             className={isFirst ? "text-bg/30" : "text-text-muted"}
+          />
+        )}
+
+        {/* Badge photo joueur — en bas à droite */}
+        {entry.photoUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={entry.photoUrl}
+            alt={entry.name}
+            className={`
+              absolute -bottom-1 -right-1 object-cover rounded-full
+              ring-2 ${isFirst ? "ring-lime-400" : "ring-white/20"}
+              ${isFirst ? "w-12 h-12" : "w-8 h-8"}
+            `}
           />
         )}
       </div>
@@ -347,8 +379,8 @@ function ListRow({
         </div>
       </div>
 
-      {/* BARRE ANIMÉE */}
-      <div className="flex-1 min-w-0">
+{/* BARRE ANIMÉE avec photo au bout */}
+      <div className="flex-1 min-w-0 relative ">
         <div
           data-bar
           className="h-10 rounded-md flex items-center justify-end pr-3 bg-gradient-to-r from-accent/60 to-accent/30"
@@ -359,10 +391,34 @@ function ListRow({
             className="text-lg font-black tabular-nums whitespace-nowrap text-text-primary"
           >
             {entry.goals}
-            <span className="text-xs font-normal ml-1">buts</span>
+            <span className="text-xs font-normal ml-1 mr-4">buts</span>
           </span>
         </div>
+
+        {/* Photo positionnée au bout de la barre — center sur l'arête droite */}
+        <div
+          data-photo-cursor
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 pointer-events-none"
+          style={{ left: "0%" }}
+        >
+          {entry.photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={entry.photoUrl}
+              alt={entry.name}
+              className="w-10 h-10 min-w-10 min-h-10 aspect-square object-cover rounded-full ring-2 ring-accent/60"
+            />
+          ) : (
+          <img
+            src={entry.photoUrl ?? `https://api.dicebear.com/9.x/personas/svg?seed=${encodeURIComponent(entry.name)}`}
+            alt={entry.name}
+            className="w-10 h-10 min-w-10 min-h-10 aspect-square object-cover rounded-full ring-2 ring-accent/30 bg-white"
+          />
+          )}
+        </div>
       </div>
+
+
     </div>
   )
 }

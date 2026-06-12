@@ -9,7 +9,8 @@
     "lint": "eslint",
     "postinstall": "prisma generate",
     "seed:teams": "tsx prisma/seed-teams.ts",
-    "sync:season": "tsx prisma/sync-season.ts"
+    "sync:season": "tsx prisma/sync-season.ts",
+    "sync:photos": "tsx prisma/sync-player-photos.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",
@@ -38,6 +39,7 @@
     "eslint-config-next": "16.2.4",
     "prisma": "^7.8.0",
     "tailwindcss": "^4",
+    "tsconfig-paths": "^4.2.0",
     "tsx": "^4.22.1",
     "typescript": "^5"
   }

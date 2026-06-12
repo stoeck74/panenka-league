@@ -124,7 +124,7 @@ export function TopTeamCard({ topTeam }: TopTeamCardProps) {
         {/* Colonne droite : points centrés verticalement */}
         <p
           ref={numberRef}
-          className="text-5xl md:text-[6vw] font-black tabular-nums flex-1 text-center"
+          className="text-5xl md:text-[4.5vw] font-black tabular-nums flex-1 text-center"
           style={{
             background: "linear-gradient(135deg, #A8FF00, #65a30d)",
             WebkitBackgroundClip: "text",
@@ -133,7 +133,7 @@ export function TopTeamCard({ topTeam }: TopTeamCardProps) {
           }}
         >
           {displayedPoints}
-          <span className="text-base font-normal text-text-muted ml-1">pts</span>
+          <span className="text-base font-normal text-neutral-200 ml-1">pts</span>
         </p>
       </div>
 

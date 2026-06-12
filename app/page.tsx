@@ -69,7 +69,7 @@ useEffect(() => {
     <source src="/intro.mp4" type="video/mp4" />
   </video>
         {/* Overlay pour assombrir ou teinter la vidéo si besoin (optionnel) */}
-        <div className="absolute bg-black/50 inset-0 ntsc-effect" /> 
+        <div className="absolute bg-black/50 inset-0 ntsc-effect opacity-50 mix-blend-multiply" /> 
       </div>
 
     

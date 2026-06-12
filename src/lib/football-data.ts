@@ -208,3 +208,29 @@ export async function fetchScorers(limit: number = 15): Promise<ApiScorer[]> {
   )
   return data.scorers
 }
+
+// ============================================
+// SQUADS — Joueurs par équipe
+// ============================================
+
+export type ApiPlayer = {
+  id: number
+  name: string
+  position: "Goalkeeper" | "Defence" | "Midfield" | "Offence" | null
+  nationality: string | null
+}
+
+type SquadResponse = {
+  squad: ApiPlayer[]
+}
+
+/**
+ * Récupère les joueurs d'une équipe.
+ * On ne garde que les Midfield + Offence (éligibles Golden Boot).
+ */
+export async function fetchSquad(teamExternalId: number): Promise<ApiPlayer[]> {
+  const data = await apiFetch<SquadResponse>(`/teams/${teamExternalId}`)
+  return data.squad.filter(
+    (p) => p.position === "Midfield" || p.position === "Offence",
+  )
+}

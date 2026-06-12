@@ -1,0 +1,178 @@
+# PANENKA LEAGUE — TODO & PLANNING
+# ============================================
+
+# ============================================
+# AVANT LE LANCEMENT (AVANT LE 23 AOÛT 2026)
+# ============================================
+
+## TECHNIQUE — À FAIRE AVANT LA J1
+
+[ ] Régénérer CRON_SECRET (l'actuel a été exposé)
+    → Générer : node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+    → Mettre à jour : .env local + Vercel env vars + cron-job.org URLs
+
+[ ] Désactiver DEV_FORCE_CURRENT_MATCHDAY dans .env local et Vercel
+    → Vérifier que la ligne est absente ou commentée avant le 23 août
+
+[ ] Désactiver le bypass dev du Golden Boot lock
+    → Dans src/lib/actions/golden-boot.ts et src/lib/dashboard-data.ts
+    → Retirer les conditions "if (process.env.NODE_ENV !== 'production') return false"
+
+[ ] Intégrer goldenBootPoints dans le classement final
+    → Dans src/lib/classement-data.ts : totalPoints = pronos + goldenBootPoints
+    → Idem dans dashboard-data.ts (getUserPosition, getLeaderboardTop, getChartData)
+
+[ ] Créer les 6 jobs cron-job.org pour la saison
+    → Job 1 : "0 9 * * *"           Veille saison (1 août → 22 août)
+    → Job 2 : "0 8,14,20 * * 1-4"   Lundi-Jeudi saison normale
+    → Job 3 : "*/15 18-23 * * 5"    Vendredi soir
+    → Job 4 : "*/10 * * * 6"        Samedi (jour de match)
+    → Job 5 : "*/10 * * * 0"        Dimanche (jour de match)
+    → Job 6 : "*/15 0-2 * * 1"      Lundi nuit (fin des matchs tardifs)
+    → URL : https://panenka-league.vercel.app/api/sync-matches?token=TON_NOUVEAU_CRON_SECRET
+
+[ ] Tester le parcours utilisateur complet avec un compte fresh
+    → register avec code d'invitation
+    → onboarding /aide
+    → personnaliser profil (avatar, équipe favorite, joueur favori)
+    → pronostiquer la J1
+    → vérifier classement après les premiers matchs
+
+[ ] Générer des codes d'invitation pour tes potes
+    → Via Prisma Studio : table InvitationCode
+    → Format : PANENKA-2026-XXXX
+
+[ ] Favicon + OG image déjà faits ✓
+[ ] Page 404 déjà faite ✓
+
+
+# ============================================
+# JUIN 2026
+# ============================================
+
+[ ] Vers le 15 juin : mercato estival ouvre
+    → Rien à faire, surveiller juste
+
+[ ] Fin juin / début juillet : Football-Data publie le calendrier 26/27
+    → Lancer une sync manuelle pour récupérer le calendrier J1-J34 :
+       http://localhost:3000/api/sync-matches?token=...&force=true&wait=true
+    → Vérifier que les 34 journées sont bien en DB
+
+
+# ============================================
+# JUILLET 2026
+# ============================================
+
+[ ] Juillet : squads 26/27 publiés par Football-Data
+    → Relancer le sync joueurs : npx tsx prisma/sync-players.ts
+    → Vérifier que les nouvelles recrues apparaissent dans l'autocomplete Golden Boot
+    → ~300-500 joueurs attendus avec les squads complets
+
+[ ] Juillet : tester le Golden Boot avec les vrais joueurs 26/27
+
+[ ] Juillet : inviter les premiers potes en bêta pour test
+    → Créer les codes d'invitation
+    → Partager le lien avec l'OG image
+
+
+# ============================================
+# AOÛT 2026
+# ============================================
+
+[ ] 1er août : activer les crons de veille saison (Job 1)
+    → Désactiver après le 22 août, remplacer par les jobs saison
+
+[ ] ~15 août (J1 - 2 semaines) : ouvrir les pronos Golden Boot
+    → Vérifier que le lock Golden Boot fonctionne côté prod
+    → Annoncer à tes potes
+
+[ ] 22 août (J1 - 1 jour) : vérifications finales
+    → Sync manuelle pour s'assurer que les données sont à jour
+    → Vérifier que DEV_FORCE_CURRENT_MATCHDAY est bien absent en prod
+    → Activer les 6 jobs cron (Jobs 2-6)
+
+[ ] 23 août : J1 !!
+    → Surveiller les logs Vercel pendant les matchs
+    → Vérifier que les points se calculent bien après les matchs
+
+
+# ============================================
+# JANVIER 2027 — MERCATO HIVERNAL
+# ============================================
+
+[ ] 1er janvier : mercato hivernal ouvre (jusqu'au 1er février)
+    → Mi-janvier : relancer sync joueurs pour les transferts :
+       npx tsx prisma/sync-players.ts
+    → Vérifier les nouvelles recrues dans l'autocomplete
+
+
+# ============================================
+# MAI 2027 — FIN DE SAISON
+# ============================================
+
+[ ] 29 mai 2027 : J34 (dernière journée)
+    → Après les matchs : sync forcée pour s'assurer que tous les points sont calculés
+       https://panenka-league.vercel.app/api/sync-matches?token=...&force=true
+    → Vérifier le classement final
+
+[ ] Après la J34 : calcul des points Golden Boot
+    → npx tsx prisma/recalculate-golden-boot.ts
+    → Vérifier que les goldenBootPoints sont bien mis à jour en DB
+    → Vérifier le classement final avec golden boot inclus
+
+[ ] Désactiver les 6 jobs cron (ou laisser job veille quotidien)
+
+[ ] Célébrer avec tes potes 🏆
+
+
+# ============================================
+# BACKLOG — FEATURES POUR PLUS TARD
+# ============================================
+
+[ ] Mécanisme "poc" (notification quand on dépasse quelqu'un au classement)
+    → Table Poke en DB + server action + UI dans RankingTrendCard
+
+[ ] Page historique perso (mes pronos par journée)
+
+[ ] Tableau head-to-head entre 2 joueurs
+
+[ ] Notifications email/push pour rappeler les pronos avant J-1h
+
+[ ] Page admin fonctionnelle (stats + recalcul forcé)
+    → Actuellement dans app/(app)/_admin — à réactiver et adapter
+
+[ ] Afficher goldenBootPoints séparément dans le profil joueur
+    → "X pts pronos + Y pts Golden Boot = Z pts total"
+
+
+# ============================================
+# NOTES TECHNIQUES
+# ============================================
+
+# Commandes utiles
+# ----------------
+# Sync manuelle en prod (async) :
+#   https://panenka-league.vercel.app/api/sync-matches?token=CRON_SECRET
+#
+# Sync forcée avec recalcul (synchrone, ~40s) :
+#   https://panenka-league.vercel.app/api/sync-matches?token=CRON_SECRET&force=true&wait=true
+#
+# Sync joueurs (CLI, ~2 min) :
+#   npx tsx prisma/sync-players.ts
+#
+# Recalcul Golden Boot (CLI, fin de saison) :
+#   npx tsx prisma/recalculate-golden-boot.ts
+#
+# Override dev pour tester une journée spécifique :
+#   Dans .env : DEV_FORCE_CURRENT_MATCHDAY=22
+#
+# Override dev pour tester la "dernière journée jouée" :
+#   Dans .env : DEV_FORCE_LAST_FINISHED_MATCHDAY=21
+
+# Calendrier L1 2026/2027
+# -----------------------
+# Mercato estival : 15 juin → 1er septembre 2026
+# Mercato hivernal : 1er janvier → 1er février 2027
+# J1  : dimanche 23 août 2026
+# J17 : dimanche 24 janvier 2027 (fin des matchs aller)
+# J34 : samedi 29 mai 2027
