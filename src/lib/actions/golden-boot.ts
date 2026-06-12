@@ -3,8 +3,7 @@
 import { auth } from "@/../auth"
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
-
-const LOCK_BEFORE_KICKOFF_MS = 60 * 60 * 1000 // 1h
+import { isLockedAt } from "@/lib/lock"
 
 // ============================================
 // LOCK — T-1h avant le 1er match de J1
@@ -26,7 +25,7 @@ async function isGoldenBootLocked(): Promise<boolean> {
   })
   if (!firstMatch) return false
 
-  return Date.now() >= firstMatch.kickoffAt.getTime() - 60 * 60 * 1000
+  return isLockedAt(firstMatch.kickoffAt)
 }
 
 // ============================================

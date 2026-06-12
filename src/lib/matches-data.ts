@@ -6,6 +6,7 @@
 // et mappe tout au format attendu par <MatchsView />.
 
 import { prisma } from "@/lib/prisma"
+import { getLockAt, isLockedAt } from "@/lib/lock"
 
 const WINDOW_BEFORE = 3
 const WINDOW_AFTER = 3
@@ -41,6 +42,13 @@ export type ViewMatch = {
 export type ViewMatchday = {
   number: number
   status: "past" | "current" | "future"
+  // Instant de verrouillage de la journée (ISO) = 1er kickoff - 1h.
+  // null si la journée n'a aucun match. Sert au verrou côté client,
+  // calculé sur le calendrier (pas sur la sync API).
+  lockAt: string | null
+  // Snapshot serveur : la journée est-elle déjà verrouillée au moment
+  // du rendu ? Valeur déterministe (pas de mismatch d'hydratation).
+  isLocked: boolean
 }
 
 export type MatchsPageData = {
@@ -146,10 +154,18 @@ export async function getMatchsPageData(
   }
 
   // 7. Mapping vers les types View
-  const matchdays: ViewMatchday[] = matchdaysInWindow.map((md) => ({
-    number: md.number,
-    status: mapMatchdayStatus(md.status, md.number, centralNumber),
-  }))
+  const matchdays: ViewMatchday[] = matchdaysInWindow.map((md) => {
+    // md.matches est trié par kickoffAt asc → [0] = premier coup d'envoi.
+    // Même base de calcul que le serveur (isMatchdayOpen) → cohérence garantie.
+    const firstKickoff = md.matches[0]?.kickoffAt ?? null
+    const lockAt = firstKickoff ? getLockAt(firstKickoff) : null
+    return {
+      number: md.number,
+      status: mapMatchdayStatus(md.status, md.number, centralNumber),
+      lockAt: lockAt ? lockAt.toISOString() : null,
+      isLocked: firstKickoff ? isLockedAt(firstKickoff) : false,
+    }
+  })
 
   const matches: ViewMatch[] = matchdaysInWindow.flatMap((md) =>
     md.matches.map((m) => {

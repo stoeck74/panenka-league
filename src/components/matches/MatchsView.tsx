@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { MatchCard } from "./MatchCard"
 import type { ViewMatch, ViewMatchday } from "@/lib/matches-data"
 import { savePrediction, toggleBanco } from "@/lib/actions/predictions"
+import { LOCK_BEFORE_KICKOFF_MS } from "@/lib/lock"
 
 type MatchsViewProps = {
   matches: ViewMatch[]
@@ -45,6 +46,20 @@ export function MatchsView({
     Map<string, { home: number | null; away: number | null }>
   >(new Map())
 
+  // ============================================
+  // VERROU PAR JOURNÉE (aligné serveur, calé sur kickoffAt)
+  // ============================================
+  // Init depuis le snapshot serveur `isLocked` (déterministe → pas de
+  // mismatch d'hydratation). Un timer bascule ensuite chaque journée en
+  // verrouillé pile à son `lockAt`, sans refetch ni sync API.
+  const [lockedMatchdays, setLockedMatchdays] = useState<Set<number>>(
+    () => new Set(matchdays.filter((md) => md.isLocked).map((md) => md.number)),
+  )
+
+  // Horloge locale pour le compteur "coup d'envoi". null avant montage
+  // pour éviter tout mismatch d'hydratation (le serveur ne connaît pas l'heure client).
+  const [now, setNow] = useState<number | null>(null)
+
  // Hydrate les pronos depuis les props pour les matchs qu'on ne connaît PAS encore.
   // Si on a déjà saisi un prono pendant la session, on garde notre state local.
   useEffect(() => {
@@ -72,6 +87,74 @@ export function MatchsView({
       return next
     })
   }, [displayedMatches])
+
+  // ============================================
+  // EFFET — verrouillage temporel des journées
+  // ============================================
+  // Pour chaque journée avec un lockAt à venir (et imminent), on programme
+  // un setTimeout qui la passe en verrouillé pile à l'instant T. On borne le
+  // délai à 24h : setTimeout déborde au-delà de ~24,8j (2^31 ms) et tirerait
+  // immédiatement. Les journées lointaines seront verrouillées au prochain
+  // chargement de page de toute façon.
+  useEffect(() => {
+    const MAX_DELAY = 24 * 60 * 60 * 1000
+    const ref = Date.now()
+    const timers: NodeJS.Timeout[] = []
+
+    matchdays.forEach((md) => {
+      if (!md.lockAt) return
+      const delay = new Date(md.lockAt).getTime() - ref
+
+      if (delay <= 0) {
+        // Déjà verrouillée (ex. horloge client en avance / onglet resté ouvert)
+        setLockedMatchdays((prev) => {
+          if (prev.has(md.number)) return prev
+          const next = new Set(prev)
+          next.add(md.number)
+          return next
+        })
+      } else if (delay <= MAX_DELAY) {
+        const t = setTimeout(() => {
+          setLockedMatchdays((prev) => {
+            const next = new Set(prev)
+            next.add(md.number)
+            return next
+          })
+          toast.info(`Journée ${md.number} verrouillée — pronos fermés`)
+        }, delay)
+        timers.push(t)
+      }
+    })
+
+    return () => timers.forEach(clearTimeout)
+  }, [matchdays])
+
+  // ============================================
+  // EFFET — horloge du compteur "coup d'envoi"
+  // ============================================
+  useEffect(() => {
+    setNow(Date.now())
+    const interval = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const selectedMatchdayLocked = lockedMatchdays.has(selectedMatchday)
+
+  // Compteur jusqu'au 1er coup d'envoi de la journée sélectionnée
+  // (kickoff = lockAt + 1h). null tant que non monté ou si déjà passé.
+  const kickoffCountdown = useMemo(() => {
+    if (now === null || !selectedMatchdayInfo?.lockAt) return null
+    const kickoff = new Date(selectedMatchdayInfo.lockAt).getTime() + LOCK_BEFORE_KICKOFF_MS
+    const diff = kickoff - now
+    if (diff <= 0) return null
+    const totalMinutes = Math.floor(diff / 60_000)
+    const days = Math.floor(totalMinutes / (60 * 24))
+    const hours = Math.floor((totalMinutes % (60 * 24)) / 60)
+    const minutes = totalMinutes % 60
+    if (days > 0) return `${days}j ${hours}h`
+    if (hours > 0) return `${hours}h ${String(minutes).padStart(2, "0")}min`
+    return `${minutes}min`
+  }, [now, selectedMatchdayInfo])
 
   // Refs animations GSAP
   const headerRef = useRef<HTMLDivElement>(null)
@@ -118,6 +201,13 @@ export function MatchsView({
     home: number | null,
     away: number | null
   ) => {
+    // Garde-fou : journée verrouillée → on n'optimistic-update même pas
+    // (évite le flicker saisie → rollback). Le serveur revérifie de toute façon.
+    if (selectedMatchdayLocked) {
+      toast.error("La journée est verrouillée")
+      return
+    }
+
     // Optimistic : mise à jour immédiate du state local
     const previous = predictions.get(matchId) ?? { home: null, away: null }
     setPredictions((prev) => {
@@ -158,6 +248,11 @@ export function MatchsView({
   // HANDLER BANCO : optimistic update + server action + rollback
   // ============================================
   const handleBancoToggle = (matchId: string) => {
+    if (selectedMatchdayLocked) {
+      toast.error("La journée est verrouillée")
+      return
+    }
+
     const wasBanco = bancoIds.has(matchId)
     const willBeBanco = !wasBanco
 
@@ -269,7 +364,9 @@ export function MatchsView({
                   Coup d&apos;envoi
                 </p>
                 <p className="text-2xl font-black text-text-primary tabular-nums">
-                  2j 14h
+                  {selectedMatchdayLocked
+                    ? "Fermé"
+                    : kickoffCountdown ?? "—"}
                 </p>
               </div>
             </div>
@@ -320,6 +417,7 @@ export function MatchsView({
                   isBanco={bancoIds.has(match.id)}
                   bancoLimitReached={bancosOnSelectedMatchday >= MAX_BANCOS && !bancoIds.has(match.id)}
                   matchdayStatus={matchdayStatus}
+                  matchdayLocked={selectedMatchdayLocked}
                   onPredictionChange={handlePredictionChange}
                   onBancoToggle={handleBancoToggle}
                 />

@@ -16,6 +16,7 @@ type MatchCardProps = {
   isBanco: boolean
   bancoLimitReached: boolean
   matchdayStatus: MatchdayStatus
+  matchdayLocked: boolean
   onPredictionChange: (matchId: string, home: number | null, away: number | null) => void
   onBancoToggle: (matchId: string) => void
 }
@@ -27,6 +28,7 @@ export function MatchCard({
   isBanco,
   bancoLimitReached,
   matchdayStatus,
+  matchdayLocked,
   onPredictionChange,
   onBancoToggle,
 }: MatchCardProps) {
@@ -90,11 +92,20 @@ export function MatchCard({
   // Lecture seule si :
   // - Journée passée (matchs déjà joués)
   // - Journée future (pas encore pronostiquable)
-  // - Match individuel verrouillé (kickoff dépassé sur la journée courante)
-  const isReadOnly = matchdayStatus !== "current" || match.status !== "scheduled"
+  // - Journée VERROUILLÉE par le temps (T-1h du 1er match) → matchdayLocked
+  //   C'est le verrou qui s'aligne pile sur le serveur (calé sur kickoffAt,
+  //   indépendant de la sync API).
+  // - Match individuel déjà live/terminé (filet de sécurité)
+  const isReadOnly =
+    matchdayStatus !== "current" ||
+    matchdayLocked ||
+    match.status !== "scheduled"
 
-  // Banco visible uniquement sur la journée courante
-  const showBancoToggle = matchdayStatus === "current" && match.status === "scheduled"
+  // Banco visible uniquement sur la journée courante, non verrouillée, scheduled
+  const showBancoToggle =
+    matchdayStatus === "current" &&
+    !matchdayLocked &&
+    match.status === "scheduled"
 
   const bancoDisabled = bancoLimitReached && !isBanco
   const isFinished = match.status === "finished"
@@ -177,8 +188,10 @@ export function MatchCard({
             </div>
           )}
 
-          {/* Indicateur lecture seule — sur journée future */}
-          {matchdayStatus === "future" && (
+          {/* Indicateur lecture seule — journée future OU journée courante
+              déjà verrouillée par le temps (pronos fermés) */}
+          {(matchdayStatus === "future" ||
+            (matchdayLocked && matchdayStatus === "current" && !isFinished)) && (
             <div className="w-8 h-8 rounded-full bg-white/[0.03] flex items-center justify-center">
               <Lock size={14} weight="regular" className="text-text-muted" />
             </div>

@@ -3,12 +3,12 @@
 import { auth } from "@/../auth"
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { isLockedAt } from "@/lib/lock"
 
 // ============================================
 // CONSTANTES MÉTIER
 // ============================================
 const MAX_BANCOS_PER_MATCHDAY = 2
-const LOCK_BEFORE_KICKOFF_MS = 60 * 60 * 1000 // 1h
 
 // ============================================
 // HELPER — Une matchday est-elle ouverte aux pronos ?
@@ -16,6 +16,7 @@ const LOCK_BEFORE_KICKOFF_MS = 60 * 60 * 1000 // 1h
 // Règle Panenka : on peut pronostiquer sur une matchday tant que
 // le premier match de cette matchday est à plus de 1h dans le futur.
 // Si le 1er kickoff est dans moins d'1h (ou passé), tout est lock.
+// (Même règle que le client — cf. src/lib/lock.ts.)
 async function isMatchdayOpen(matchdayId: string): Promise<boolean> {
   const firstMatch = await prisma.match.findFirst({
     where: { matchdayId },
@@ -23,8 +24,7 @@ async function isMatchdayOpen(matchdayId: string): Promise<boolean> {
     select: { kickoffAt: true },
   })
   if (!firstMatch) return false
-  const lockTime = firstMatch.kickoffAt.getTime() - LOCK_BEFORE_KICKOFF_MS
-  return Date.now() < lockTime
+  return !isLockedAt(firstMatch.kickoffAt)
 }
 
 // ============================================
