@@ -49,20 +49,39 @@ const EXCLUDED_POSITIONS = new Set([
 // HELPERS
 // ============================================
 
-async function fetchTeamDetail(teamExternalId: number): Promise<ApiTeamDetail> {
+async function fetchTeamDetail(
+  teamExternalId: number,
+  maxRetries: number = 3,
+): Promise<ApiTeamDetail> {
   const token = process.env.FOOTBALL_DATA_API_KEY
   if (!token) throw new Error("FOOTBALL_DATA_API_KEY is not defined in .env")
 
-  const response = await fetch(`${API_BASE}/teams/${teamExternalId}`, {
-    headers: { "X-Auth-Token": token },
-    cache: "no-store",
-  } as RequestInit)
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const response = await fetch(`${API_BASE}/teams/${teamExternalId}`, {
+      headers: { "X-Auth-Token": token },
+      cache: "no-store",
+    } as RequestInit)
 
-  if (!response.ok) {
+    if (response.ok) {
+      return response.json()
+    }
+
+    // Rate limit : on respecte Retry-After si présent, sinon backoff
+    // progressif (30s, 60s, 90s...), plutôt que d'abandonner direct.
+    if (response.status === 429 && attempt < maxRetries) {
+      const retryAfterHeader = response.headers.get("Retry-After")
+      const waitMs = retryAfterHeader
+        ? parseInt(retryAfterHeader, 10) * 1000
+        : 30000 * (attempt + 1)
+      console.log(`\n  ⏳ 429, retry dans ${waitMs / 1000}s (tentative ${attempt + 1}/${maxRetries})`)
+      await sleep(waitMs)
+      continue
+    }
+
     throw new Error(`API error ${response.status}: ${response.statusText}`)
   }
 
-  return response.json()
+  throw new Error(`API error 429 après ${maxRetries} tentatives`)
 }
 
 function sleep(ms: number): Promise<void> {

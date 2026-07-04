@@ -16,21 +16,50 @@ const EXCLUDED_POSITIONS = new Set([
   "Wing-Back",
 ])
 
-async function fetchSquad(teamExternalId: number) {
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function fetchSquad(
+  teamExternalId: number,
+  maxRetries: number = 3,
+): Promise<Array<{ id: number; name: string; position: string | null; nationality: string | null }>> {
   const token = process.env.FOOTBALL_DATA_API_KEY
   if (!token) throw new Error("FOOTBALL_DATA_API_KEY not configured")
 
-  const res = await fetch(`${API_BASE}/teams/${teamExternalId}`, {
-    headers: { "X-Auth-Token": token },
-    cache: "no-store",
-  })
-  if (!res.ok) throw new Error(`API error ${res.status}`)
-  const data = await res.json() as { squad: Array<{ id: number; name: string; position: string | null; nationality: string | null }> }
-  return data.squad ?? []
-}
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const res = await fetch(`${API_BASE}/teams/${teamExternalId}`, {
+      headers: { "X-Auth-Token": token },
+      cache: "no-store",
+    })
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+    if (res.ok) {
+      const data = (await res.json()) as {
+        squad: Array<{ id: number; name: string; position: string | null; nationality: string | null }>
+      }
+      return data.squad ?? []
+    }
+
+    // Rate limit : on respecte le header Retry-After s'il est présent,
+    // sinon backoff progressif (30s, 60s, 90s...). On réessaie au lieu
+    // d'abandonner immédiatement, car un 429 isolé ne veut pas dire que
+    // le token est mauvais — juste qu'il faut ralentir.
+    if (res.status === 429 && attempt < maxRetries) {
+      const retryAfterHeader = res.headers.get("Retry-After")
+      const waitMs = retryAfterHeader
+        ? parseInt(retryAfterHeader, 10) * 1000
+        : 30000 * (attempt + 1)
+      console.warn(
+        `[sync-players] 429 pour l'équipe ${teamExternalId}, retry dans ${waitMs / 1000}s (tentative ${attempt + 1}/${maxRetries})`,
+      )
+      await sleep(waitMs)
+      continue
+    }
+
+    throw new Error(`API error ${res.status}`)
+  }
+
+  throw new Error(`API error 429 après ${maxRetries} tentatives`)
 }
 
 export async function POST(request: NextRequest) {
