@@ -12,6 +12,7 @@
 
 import { prisma } from "@/lib/prisma"
 import { calculatePoints } from "@/lib/points"
+import { isLockedAt } from "@/lib/lock"
 
 // ============================================
 // CONSTANTES + TYPES
@@ -102,6 +103,23 @@ export type ChartDataPoint = {
   points: number
   cumulative: number
   position: number
+}
+
+// ============================================
+// HELPER — Points hors-pronos (bonus admin + Golden Boot)
+// ============================================
+// Utilisé par tous les calculs de classement/position ci-dessous pour
+// rester cohérent avec /api/admin/data et classement-data.ts, qui
+// incluent déjà bonusPoints + goldenBootPoints dans le total affiché.
+// Sans ça, un ajustement de points admin (correction de bug) ou les
+// points Golden Boot de fin de saison n'apparaissaient jamais dans le
+// classement / dashboard vus par les joueurs.
+
+async function getBonusAndGoldenBootByUser(): Promise<Map<string, number>> {
+  const users = await prisma.user.findMany({
+    select: { id: true, bonusPoints: true, goldenBootPoints: true },
+  })
+  return new Map(users.map((u) => [u.id, u.bonusPoints + u.goldenBootPoints]))
 }
 
 // ============================================
@@ -420,8 +438,13 @@ export async function getUserPosition(userId: string): Promise<UserPosition> {
     )
   }
 
+  const bonusByUser = await getBonusAndGoldenBootByUser()
+
   const sorted = users
-    .map((u) => ({ userId: u.id, points: pointsByUser.get(u.id) ?? 0 }))
+    .map((u) => ({
+      userId: u.id,
+      points: (pointsByUser.get(u.id) ?? 0) + (bonusByUser.get(u.id) ?? 0),
+    }))
     .sort((a, b) => b.points - a.points)
 
   let position = sorted.length
@@ -533,13 +556,15 @@ export async function getLeaderboardTop(
     )
   }
 
+  const bonusByUser = await getBonusAndGoldenBootByUser()
+
   const sorted = users
     .map((u) => ({
       userId: u.id,
       username: u.username,
       avatarStyle: u.avatarStyle,
       avatarSeed: u.avatarSeed,
-      points: pointsByUser.get(u.id) ?? 0,
+      points: (pointsByUser.get(u.id) ?? 0) + (bonusByUser.get(u.id) ?? 0),
     }))
     .sort((a, b) => {
       if (b.points !== a.points) return b.points - a.points
@@ -701,7 +726,13 @@ export async function getChartData(userId: string): Promise<ChartDataPoint[]> {
     userMap.set(p.userId, (userMap.get(p.userId) ?? 0) + (p.pointsEarned ?? 0))
   }
 
-  const cumulativeByUser = new Map<string, number>()
+  // Bonus admin + Golden Boot : on les injecte comme un socle de départ
+  // (avant J1) pour que le "cumulative" final colle au classement réel,
+  // et que le classement affiché à chaque journée reste cohérent avec
+  // /classement (sans ça, la courbe de position pouvait diverger du
+  // classement officiel dès qu'un bonus était appliqué).
+  const bonusByUser = await getBonusAndGoldenBootByUser()
+  const cumulativeByUser = new Map<string, number>(bonusByUser)
   const result: ChartDataPoint[] = []
 
   for (let i = 0; i < finishedMatchdays.length; i++) {
@@ -1101,11 +1132,18 @@ export async function getRankingAtMatchdays(
     )
   }
 
+  // Bonus admin + Golden Boot : montant flat, identique quel que soit le
+  // sous-ensemble de journées regardé. On l'ajoute uniformément à chaque
+  // snapshot (avant/après) donc ça ne fausse pas le delta de tendance —
+  // ça garantit juste que le classement "à un instant T" colle au
+  // classement réel (celui du dashboard/classement).
+  const bonusByUser = await getBonusAndGoldenBootByUser()
+
   const sorted = users
     .map((u) => ({
       userId: u.id,
       username: u.username,
-      points: pointsByUser.get(u.id) ?? 0,
+      points: (pointsByUser.get(u.id) ?? 0) + (bonusByUser.get(u.id) ?? 0),
     }))
     .sort((a, b) => {
       if (b.points !== a.points) return b.points - a.points
@@ -1231,9 +1269,13 @@ export async function getGoldenBootInitialData(userId: string) {
       select: { kickoffAt: true },
     })
     if (firstMatch) {
-isLocked = process.env.NODE_ENV === "production"
-    ? Date.now() >= firstMatch.kickoffAt.getTime() - 60 * 60 * 1000
-    : false    }
+      // Même règle que partout ailleurs (src/lib/lock.ts) : T-1h avant le
+      // 1er match. En dev, jamais verrouillé (comme golden-boot.ts).
+      isLocked =
+        process.env.NODE_ENV === "production"
+          ? isLockedAt(firstMatch.kickoffAt)
+          : false
+    }
   }
 
   const user = await prisma.user.findUnique({
@@ -1263,4 +1305,120 @@ isLocked = process.env.NODE_ENV === "production"
     },
     isLocked,
   }
+}
+
+// ============================================
+// 12. PROFILE STATS — Position / Bancos / Meilleur prono
+// ============================================
+// Remplace les stats en dur (placeholder) de la page profil par les
+// vraies données : position au classement (bonus/golden boot inclus,
+// cf. getUserPosition), nombre de bancos joués, et meilleur prono
+// (le plus gros score gagné sur un seul match + la journée concernée).
+
+export type ProfileStats = {
+  position: number
+  totalPlayers: number
+  bancosPlayed: number
+  bestScore: number | null
+  bestMatchday: number | null
+}
+
+export async function getProfileStats(userId: string): Promise<ProfileStats> {
+  const season = await prisma.season.findFirst({
+    where: { isActive: true },
+    select: { id: true },
+  })
+
+  const { position, totalPlayers } = await getUserPosition(userId)
+
+  if (!season) {
+    return { position, totalPlayers, bancosPlayed: 0, bestScore: null, bestMatchday: null }
+  }
+
+  const bancosPlayed = await prisma.prediction.count({
+    where: { userId, isBanco: true, match: { matchday: { seasonId: season.id } } },
+  })
+
+  const best = await prisma.prediction.findFirst({
+    where: {
+      userId,
+      pointsEarned: { not: null },
+      match: { matchday: { seasonId: season.id } },
+    },
+    orderBy: { pointsEarned: "desc" },
+    select: { pointsEarned: true, match: { select: { matchday: { select: { number: true } } } } },
+  })
+
+  return {
+    position,
+    totalPlayers,
+    bancosPlayed,
+    bestScore: best?.pointsEarned ?? null,
+    bestMatchday: best?.match.matchday.number ?? null,
+  }
+}
+
+// ============================================
+// 13. RECENT FORM — 5 derniers résultats (rond vert/rouge)
+// ============================================
+// Affiché publiquement sur le profil de n'importe quel user.
+// Règle : vert si le prono a rapporté des points (exact ou bon résultat),
+// rouge si le prono n'a rien rapporté (mauvais résultat, ou pénalité banco).
+// On ne prend en compte que les pronos déjà jugés (match FINISHED +
+// pointsEarned renseigné), triés du plus récent au plus ancien puis
+// remis dans l'ordre chronologique pour l'affichage (gauche = plus ancien).
+
+export type RecentFormResult = {
+  matchId: string
+  points: number
+  result: "good" | "bad"
+  matchdayNumber: number
+  homeTeamTla: string
+  awayTeamTla: string
+  homeScore: number | null
+  awayScore: number | null
+}
+
+export async function getRecentForm(
+  userId: string,
+  limit: number = 5,
+): Promise<RecentFormResult[]> {
+  const predictions = await prisma.prediction.findMany({
+    where: {
+      userId,
+      pointsEarned: { not: null },
+      match: { status: "FINISHED" },
+    },
+    orderBy: { match: { kickoffAt: "desc" } },
+    take: limit,
+    select: {
+      matchId: true,
+      pointsEarned: true,
+      match: {
+        select: {
+          homeScore: true,
+          awayScore: true,
+          homeTeam: { select: { tla: true } },
+          awayTeam: { select: { tla: true } },
+          matchday: { select: { number: true } },
+        },
+      },
+    },
+  })
+
+  return predictions
+    .map((p) => {
+      const points = p.pointsEarned ?? 0
+      return {
+        matchId: p.matchId,
+        points,
+        result: (points > 0 ? "good" : "bad") as "good" | "bad",
+        matchdayNumber: p.match.matchday.number,
+        homeTeamTla: p.match.homeTeam.tla,
+        awayTeamTla: p.match.awayTeam.tla,
+        homeScore: p.match.homeScore,
+        awayScore: p.match.awayScore,
+      }
+    })
+    .reverse()
 }

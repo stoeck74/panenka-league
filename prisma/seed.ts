@@ -10,6 +10,17 @@ const adapter = new PrismaPg({
 const prisma = new PrismaClient({ adapter })
 
 async function main() {
+  // Garde-fou : ce script efface TOUS les users. Ne doit jamais tourner
+  // contre la base de prod, même par erreur (mauvais .env local, copier-
+  // coller malheureux...). On bloque explicitement si NODE_ENV=production
+  // ou si le DATABASE_URL ne ressemble pas à une base locale/dev.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "[seed] Refus de tourner avec NODE_ENV=production. " +
+        "Ce script efface tous les users — vérifie ton .env avant de forcer.",
+    )
+  }
+
   // Wipe all users first
   await prisma.invitationCode.deleteMany()
   await prisma.user.deleteMany()

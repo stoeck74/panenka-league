@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/../auth"
 import { prisma } from "@/lib/prisma"
+import { findPlayerIdForScorer } from "@/lib/golden-boot-matching"
 
 const POINTS_PRESENT = 5
 const POINTS_EXACT_PLACE = 5
@@ -30,17 +31,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "Pas de top 3 buteurs en DB" })
     }
 
-    // Trouver les IDs Player correspondants
+    // Trouver les IDs Player correspondants (avec fallback nom normalisé)
     const top3Players = await Promise.all(
       top3.map(async (scorer) => {
-        const player = await prisma.player.findFirst({
-          where: {
-            name: { equals: scorer.name, mode: "insensitive" },
-            teamId: scorer.teamId,
-          },
-          select: { id: true },
-        })
-        return { rank: scorer.rank, playerId: player?.id ?? null }
+        const playerId = await findPlayerIdForScorer(scorer.name, scorer.teamId)
+        return { rank: scorer.rank, playerId }
       }),
     )
 

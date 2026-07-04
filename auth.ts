@@ -18,10 +18,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: "Mot de passe", type: "password" },
       },
       async authorize(credentials) {
-        console.log("🔐 [auth] credentials received:", credentials)
-
         if (!credentials?.email || !credentials?.password) {
-          console.log("🔐 [auth] missing credentials")
           return null
         }
 
@@ -37,8 +34,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           },
         })
 
-        console.log("🔐 [auth] user lookup:", user ? `FOUND ${user.email}` : "NOT FOUND")
-
         if (!user) {
           return null
         }
@@ -47,8 +42,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           credentials.password as string,
           user.password
         )
-
-        console.log("🔐 [auth] password match:", passwordMatch)
 
         if (!passwordMatch) {
           return null

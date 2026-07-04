@@ -24,15 +24,46 @@ type NavItem = {
   adminOnly?: boolean
 }
 
-const navItems: NavItem[] = [
-  { label: "Accueil", href: "/dashboard", icon: House },
-  { label: "Matchs", href: "/matchs", icon: SoccerBall },
-{ label: "Classement", href: "/classement", icon: Trophy },
-{ label: "Résultats", href: "/resultats", icon: Ranking },
-{ label: "Buteurs", href: "/buteurs", icon: Crosshair },
-  { label: "Joueurs", href: "/joueurs", icon: UsersThree },
-  { label: "Comment ça marche", href: "/aide", icon: Question },
+type NavGroup = {
+  // null = pas d'en-tête affiché pour ce groupe (ex: "Comment ça marche" seul)
+  title: string | null
+  items: NavItem[]
+}
 
+// ============================================
+// GROUPES DE NAVIGATION
+// ============================================
+// Séparés en 2 univers bien distincts pour éviter l'ambiguïté "Ligue"
+// (le championnat de France) vs "League" (Panenka League, le jeu) :
+//   - PANENKA : le jeu entre potes (pronos, classement du jeu, participants)
+//   - LIGUE 1 : les vraies données du championnat (classement officiel, buteurs)
+// Les deux univers ont chacun un item "Classement" — volontairement identique,
+// le regroupement visuel (en-tête + séparateur) suffit à lever l'ambiguïté,
+// pas besoin d'inventer un mot différent.
+
+const navGroups: NavGroup[] = [
+  {
+    title: "Panenka",
+    items: [
+      { label: "Dashboard", href: "/dashboard", icon: House },
+      { label: "Pronostics", href: "/matchs", icon: SoccerBall },
+      { label: "Classement", href: "/classement", icon: Trophy },
+      { label: "Participants", href: "/joueurs", icon: UsersThree },
+    ],
+  },
+  {
+    title: "Ligue 1",
+    items: [
+      { label: "Classement L1", href: "/resultats", icon: Ranking },
+      { label: "Buteurs", href: "/buteurs", icon: Crosshair },
+    ],
+  },
+  {
+    title: null,
+    items: [
+      { label: "Comment ça marche", href: "/aide", icon: Question },
+    ],
+  },
 ]
 
 const bottomItems: NavItem[] = [
@@ -95,33 +126,50 @@ export function Sidebar({ username, role, avatarStyle, avatarSeed }: SidebarProp
 
   </div>
 
-      {/* Navigation principale */}
-      <nav className="flex flex-col px-3 py-4 space-y-1 overflow-hidden">
-        {navItems.map((item) => {
-          const Icon = item.icon
-          const active = isActive(item.href)
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`
-                flex items-center gap-3 px-2.5 py-2.5 rounded-lg
-                transition-colors
-                ${active
-                  ? "bg-accent/10 text-accent"
-                  : "text-text-secondary hover:bg-white/5 hover:text-text-primary"
-                }
-              `}
-            >
-              <span className="shrink-0">
-                  <Icon size={22} weight="regular" />
-              </span>
-              <span className={`text-sm font-medium whitespace-nowrap transition-opacity duration-200 ${expanded ? "opacity-100" : "opacity-0"}`}>
-                {item.label}
-              </span>
-            </Link>
-          )
-        })}
+      {/* Navigation principale, groupée par univers */}
+      <nav className="flex flex-col px-3 py-4 overflow-hidden">
+        {navGroups.map((group, groupIndex) => (
+          <div key={group.title ?? `group-${groupIndex}`} className={groupIndex > 0 ? "mt-2 pt-2 border-t border-white/10" : ""}>
+            {group.title && (
+              <p
+                className={`
+                  px-2.5 mb-1 text-[10px] font-bold uppercase tracking-widest text-text-muted/70
+                  whitespace-nowrap transition-opacity duration-200
+                  ${expanded ? "opacity-100" : "opacity-0"}
+                `}
+              >
+                {group.title}
+              </p>
+            )}
+            <div className="space-y-1">
+              {group.items.map((item) => {
+                const Icon = item.icon
+                const active = isActive(item.href)
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`
+                      flex items-center gap-3 px-2.5 py-2.5 rounded-lg
+                      transition-colors
+                      ${active
+                        ? "bg-accent/10 text-accent"
+                        : "text-text-secondary hover:bg-white/5 hover:text-text-primary"
+                      }
+                    `}
+                  >
+                    <span className="shrink-0">
+                        <Icon size={22} weight="regular" />
+                    </span>
+                    <span className={`text-sm font-medium whitespace-nowrap transition-opacity duration-200 ${expanded ? "opacity-100" : "opacity-0"}`}>
+                      {item.label}
+                    </span>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Section bottom : settings + admin */}

@@ -8,6 +8,11 @@
 ## TECHNIQUE — À FAIRE AVANT LA J1
 
 [ ] Régénérer CRON_SECRET (l'actuel a été exposé)
+    → Cause corrigée : NEXT_PUBLIC_CRON_SECRET a été retiré du code (il
+      était bundlé côté client sur la page admin — n'importe qui pouvait
+      le lire et déclencher la sync). Le bouton admin passe maintenant par
+      /api/admin/sync-matches, protégé par la session admin.
+    → Mais l'ancien token a déjà fuité : le régénérer quand même avant la prod.
     → Générer : node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
     → Mettre à jour : .env local + Vercel env vars + cron-job.org URLs
 
@@ -25,6 +30,9 @@
 [ ] Créer les 6 jobs cron-job.org pour la saison
     → Job 1 : "0 9 * * *"           Veille saison (1 août → 22 août)
     → Job 2 : "0 8,14,20 * * 1-4"   Lundi-Jeudi saison normale
+      ⚠️ NE COUVRE PAS un éventuel match de lundi soir (L1 en programme
+      parfois). Si le calendrier 26/27 a un match lundi ~21h, ajouter un
+      Job 2bis : "*/15 20-23 * * 1" (lundi soir, comme le Job 3 vendredi)
     → Job 3 : "*/15 18-23 * * 5"    Vendredi soir
     → Job 4 : "*/10 * * * 6"        Samedi (jour de match)
     → Job 5 : "*/10 * * * 0"        Dimanche (jour de match)

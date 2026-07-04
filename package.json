@@ -9,8 +9,9 @@
     "lint": "eslint",
     "postinstall": "prisma generate",
     "seed:teams": "tsx prisma/seed-teams.ts",
-    "sync:season": "tsx prisma/sync-season.ts",
-    "sync:photos": "tsx prisma/sync-player-photos.ts"
+    "sync:players": "tsx prisma/sync-players.ts",
+    "sync:photos": "tsx prisma/sync-player-photos.ts",
+    "recalculate:golden-boot": "tsx prisma/recalculate-golden-boot.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",

@@ -1,5 +1,6 @@
 import "dotenv/config"
 import { prisma } from "../src/lib/prisma"
+import { findPlayerIdForScorer } from "../src/lib/golden-boot-matching"
 
 const POINTS_PRESENT = 5
 const POINTS_EXACT_PLACE = 5
@@ -27,18 +28,13 @@ async function main() {
   }
 console.log("Top 3 buteurs :", top3.map((s: { rank: number; name: string }) => `${s.rank}. ${s.name}`).join(", "))
 
-  // On cherche les IDs Player correspondants (match par nom + équipe)
+  // On cherche les IDs Player correspondants (match par nom + équipe,
+  // avec fallback sur nom normalisé si l'égalité stricte échoue)
   const top3Players = await Promise.all(
     top3.map(async (scorer) => {
-      const player = await prisma.player.findFirst({
-        where: {
-          name: { equals: scorer.name, mode: "insensitive" },
-          teamId: scorer.teamId,
-        },
-        select: { id: true },
-      })
-      if (!player) console.warn(`⚠️  Joueur introuvable en DB : ${scorer.name}`)
-      return { rank: scorer.rank, playerId: player?.id ?? null }
+      const playerId = await findPlayerIdForScorer(scorer.name, scorer.teamId)
+      if (!playerId) console.warn(`⚠️  Joueur introuvable en DB : ${scorer.name}`)
+      return { rank: scorer.rank, playerId }
     }),
   )
 

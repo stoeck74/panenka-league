@@ -7,6 +7,8 @@ import { updateFavoritePlayer } from "@/lib/actions/profile"
 import { ProfileFavoritePlayer } from "@/components/profile/ProfileFavoritePlayer"
 import { ProfileFavoriteTeam } from "@/components/profile/ProfileFavoriteTeam"
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar"
+import { RecentFormDots } from "@/components/profile/RecentFormDots"
+import { getRecentForm, getProfileStats } from "@/lib/dashboard-data"
 
 // ============================================
 // TYPES
@@ -52,6 +54,9 @@ const allTeams = await prisma.team.findMany({
   // Détecte si c'est ton propre profil
   const isOwnProfile = session.user.username.toLowerCase() === username.toLowerCase()
 
+  // 5 derniers résultats (rond vert/rouge) — visible par tout le monde
+  const recentForm = await getRecentForm(user.id)
+
   // Classe CSS pour l'image de fond équipe
   const teamBgClass = user.favoriteTeam?.tla?.toLowerCase().trim() ?? ""
 
@@ -63,14 +68,15 @@ const allTeams = await prisma.team.findMany({
   }).format(new Date(user.createdAt))
 
   // ============================================
-  // STATS — Placeholder pour V1
+  // STATS — Position réelle / bancos / meilleur prono
   // ============================================
+  const realStats = await getProfileStats(user.id)
   const stats = {
-    position: "3e",
-    totalPlayers: 8,
-    bancosPlayed: 12,
-    bestScore: 6,
-    bestMatchday: 18,
+    position: `${realStats.position}e`,
+    totalPlayers: realStats.totalPlayers,
+    bancosPlayed: realStats.bancosPlayed,
+    bestScore: realStats.bestScore,
+    bestMatchday: realStats.bestMatchday,
   }
 
   return (
@@ -111,6 +117,11 @@ const allTeams = await prisma.team.findMany({
                   Membre depuis {memberSince}
                 </p>
               </div>
+            </div>
+
+            {/* Forme récente — 5 derniers résultats, visible par tous */}
+            <div className="mb-4">
+              <RecentFormDots results={recentForm} />
             </div>
 
             {/* Bouton Modifier — uniquement sur son propre profil */}
@@ -187,10 +198,16 @@ const allTeams = await prisma.team.findMany({
                 </p>
               </div>
               <p className="text-2xl md:text-3xl font-black text-accent">
-                +{stats.bestScore}
-                <span className="text-text-muted text-sm font-normal ml-1">
-                  J{stats.bestMatchday}
-                </span>
+                {stats.bestScore !== null ? (
+                  <>
+                    {stats.bestScore > 0 ? `+${stats.bestScore}` : stats.bestScore}
+                    <span className="text-text-muted text-sm font-normal ml-1">
+                      J{stats.bestMatchday}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-text-muted text-lg font-normal">—</span>
+                )}
               </p>
             </div>
 

@@ -58,7 +58,10 @@ const trends: TrendConfig[] = [
     description: "Position dans le classement",
     type: "line",
     color: "#A8FF00",
-    yAxisInverted: false,
+    // Position 1 = meilleur classement : l'axe doit être inversé pour que
+    // "monter au classement" se traduise visuellement par une ligne qui monte.
+    // (Sans ça, une progression de 5e à 2e semble "descendre" sur le graphe.)
+    yAxisInverted: true,
   },
   {
     key: "cumulative",

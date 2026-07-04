@@ -155,14 +155,12 @@ export default function AdminPage() {
   async function handleSyncMatches() {
     setSyncMatchesState({ status: "loading", message: "Sync en cours..." })
     try {
-const res = await fetch(
-        `/api/sync-matches?token=${process.env.NEXT_PUBLIC_CRON_SECRET ?? ""}&force=true`,
-      )
+      const res = await fetch("/api/admin/sync-matches", { method: "POST" })
       const data = await res.json()
       if (data.ok) {
         setSyncMatchesState({
           status: "success",
-          message: `Sync démarrée en background. Consulte les logs."}`,
+          message: data.log?.length ? data.log.join(" · ") : "Sync terminée.",
         })
         fetchData()
       } else {

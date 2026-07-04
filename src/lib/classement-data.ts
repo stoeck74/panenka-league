@@ -62,6 +62,8 @@ export async function getClassement(
       avatar: true,
       avatarStyle: true,
       avatarSeed: true,
+      bonusPoints: true,
+      goldenBootPoints: true,
     },
   })
 
@@ -88,13 +90,16 @@ export async function getClassement(
   }
 
   // 4. Construction des entries triées
+  // Total = pronos + goldenBootPoints + bonusPoints (ajustement admin),
+  // pour rester cohérent avec /api/admin/data qui utilise déjà cette formule.
   const sorted = users
     .map((u) => ({
       userId: u.id,
       username: u.username,
       name: u.name,
       avatarUrl: resolveAvatarUrl(u),
-      totalPoints: pointsByUserId.get(u.id) ?? 0,
+      totalPoints:
+        (pointsByUserId.get(u.id) ?? 0) + u.goldenBootPoints + u.bonusPoints,
       isCurrentUser: u.id === currentUserId,
     }))
     .sort((a, b) => {

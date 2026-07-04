@@ -37,7 +37,7 @@ export default async function AppLayout({
       </main>
 
       {/* Bottom nav : visible uniquement sur mobile (< md) */}
-      <BottomNav />
+      <BottomNav username={session.user.username} role={session.user.role} />
     </div>
   )
 }
